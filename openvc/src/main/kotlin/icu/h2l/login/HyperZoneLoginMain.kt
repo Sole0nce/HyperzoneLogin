@@ -18,7 +18,6 @@ import icu.h2l.api.player.HyperZonePlayerAccessorProvider
 // and will register themselves with the main plugin at runtime. Do not import them here.
 import icu.h2l.login.command.HyperZoneLoginCommand
 import icu.h2l.login.config.DatabaseSourceConfig
-import icu.h2l.login.config.OfflineMatchConfig
 import icu.h2l.login.config.RemapConfig
 import icu.h2l.login.config.MiscConfig
 import icu.h2l.login.database.DatabaseConfig
@@ -29,7 +28,6 @@ import icu.h2l.login.vServer.limbo.command.ExitLimboCommand
 import icu.h2l.login.listener.EventListener
 import icu.h2l.login.manager.HyperChatCommandManagerImpl
 import icu.h2l.login.manager.HyperZonePlayerManager
-import icu.h2l.login.manager.LoginServerManager
 import icu.h2l.login.util.registerApiLogger
 import net.kyori.adventure.text.logger.slf4j.ComponentLogger
 import org.spongepowered.configurate.ConfigurationOptions
@@ -46,7 +44,6 @@ class HyperZoneLoginMain @Inject constructor(
     @DataDirectory private val dataDirectory: Path,
     private val injector: Injector
 ) : HyperZoneVServerProvider, HyperZonePlayerAccessorProvider, HyperChatCommandManagerProvider {
-    lateinit var loginServerManager: LoginServerManager
     var limboServerManager: LimboVServerAuth? = null
     lateinit var databaseManager: icu.h2l.login.manager.DatabaseManager
     lateinit var databaseHelper: DatabaseHelper
@@ -60,7 +57,6 @@ class HyperZoneLoginMain @Inject constructor(
 
     companion object {
         private lateinit var instance: HyperZoneLoginMain
-        private lateinit var offlineMatchConfig: OfflineMatchConfig
         private lateinit var databaseSourceConfig: DatabaseSourceConfig
         private lateinit var remapConfig: RemapConfig
         private lateinit var miscConfig: MiscConfig
@@ -68,9 +64,6 @@ class HyperZoneLoginMain @Inject constructor(
         @JvmStatic
         fun getInstance(): HyperZoneLoginMain = instance
 
-        @JvmStatic
-        fun getOfflineMatchConfig(): OfflineMatchConfig = offlineMatchConfig
-        
         @JvmStatic
         fun getDatabaseConfig(): DatabaseSourceConfig = databaseSourceConfig
         
@@ -87,7 +80,6 @@ class HyperZoneLoginMain @Inject constructor(
 
     @Subscribe
     fun onEnable(event: ProxyInitializeEvent) {
-        loadConfig()
         registerApiLogger()
         loadDatabaseConfig()
         loadRemapConfig()
@@ -95,8 +87,6 @@ class HyperZoneLoginMain @Inject constructor(
         connectDatabase()
         // 创建基础表（Profile 表等）
         createBaseTables()
-
-        loginServerManager = LoginServerManager()
 
         // Soft-dependency: only create/load Limbo adapter when the limboapi plugin is present
         val limboPluginPresent = server.pluginManager.getPlugin("limboapi").isPresent
@@ -168,36 +158,6 @@ class HyperZoneLoginMain @Inject constructor(
         logger.warn("========================================")
     }
 
-    private fun loadConfig() {
-        val path = dataDirectory.resolve("offlinematch.conf")
-        val firstCreation = Files.notExists(path)
-        val loader = HoconConfigurationLoader.builder()
-            .defaultOptions { opts: ConfigurationOptions ->
-                opts
-                    .shouldCopyDefaults(true)
-                    .header(
-                        """
-                            HyperZoneLogin | by ksqeib
-                            
-                        """.trimIndent()
-                    ).serializers { s ->
-                        s.registerAnnotatedObjects(
-                            ObjectMapper.factoryBuilder().addDiscoverer(dataClassFieldDiscoverer()).build()
-                        )
-                    }
-            }
-            .path(path)
-            .build()
-        val node = loader.load()
-        val config = node.get(OfflineMatchConfig::class.java)
-        if (firstCreation) {
-            node.set(config)
-            loader.save(node)
-        }
-        if (config != null) {
-            offlineMatchConfig = config
-        }
-    }
 
     private fun loadDatabaseConfig() {
         val path = dataDirectory.resolve("database.conf")

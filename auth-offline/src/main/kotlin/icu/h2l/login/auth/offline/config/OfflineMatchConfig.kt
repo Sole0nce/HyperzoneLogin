@@ -1,4 +1,4 @@
-package icu.h2l.login.config
+package icu.h2l.login.auth.offline.config
 
 import org.spongepowered.configurate.objectmapping.ConfigSerializable
 import org.spongepowered.configurate.objectmapping.meta.Comment
@@ -50,6 +50,7 @@ class OfflineMatchConfig {
 
     @ConfigSerializable
     class Advanced {
-        // Advanced settings moved to MiscConfig
+        // 留空，保留扩展位
     }
 }
+

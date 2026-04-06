@@ -11,6 +11,8 @@ import icu.h2l.login.auth.offline.command.OfflineAuthCommandRegistrar
 import icu.h2l.login.auth.offline.db.OfflineAuthRepository
 import icu.h2l.login.auth.offline.db.OfflineAuthTableManager
 import icu.h2l.login.auth.offline.service.OfflineAuthService
+import icu.h2l.login.auth.offline.config.OfflineMatchConfigLoader
+import icu.h2l.login.auth.offline.listener.OfflinePreLoginListener
 import java.nio.file.Path
 
 class OfflineSubModule : HyperSubModule {
@@ -30,6 +32,8 @@ class OfflineSubModule : HyperSubModule {
             ?: throw IllegalStateException("OfflineSubModule requires HyperZonePlayerAccessorProvider owner")
 
         val profileTable = ProfileTable(databaseManager.tablePrefix)
+        // Load offline matching configuration for this module
+        OfflineMatchConfigLoader.load(dataDirectory)
         offlineAuthTableManager = OfflineAuthTableManager(
             databaseManager = databaseManager,
             tablePrefix = databaseManager.tablePrefix,
@@ -45,6 +49,9 @@ class OfflineSubModule : HyperSubModule {
         )
         offlineAuthTableManager.createTable()
         proxy.eventManager.register(owner, offlineAuthTableManager)
+
+        // Register pre-login listener (handles channel init + offline UUID matching)
+        proxy.eventManager.register(owner, OfflinePreLoginListener())
 
         OfflineAuthCommandRegistrar.registerAll(
             commandManager = commandManagerProvider.chatCommandManager,

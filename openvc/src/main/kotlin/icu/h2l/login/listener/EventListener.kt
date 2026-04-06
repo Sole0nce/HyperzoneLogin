@@ -1,7 +1,6 @@
 package icu.h2l.login.listener
 
 import com.velocitypowered.api.event.Subscribe
-import com.velocitypowered.api.event.connection.LoginEvent
 import com.velocitypowered.api.event.player.GameProfileRequestEvent
 import com.velocitypowered.api.util.GameProfile
 import icu.h2l.api.connection.disconnectWithMessage
@@ -11,9 +10,6 @@ import icu.h2l.api.event.connection.OpenPreLoginEvent
 import icu.h2l.api.util.RemapUtils
 import icu.h2l.login.HyperZoneLoginMain
 import icu.h2l.login.manager.HyperZonePlayerManager
-import icu.h2l.login.type.OfflineUUIDType
-import icu.h2l.login.util.ExtraUuidUtils
-import icu.h2l.login.util.info
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 
@@ -24,28 +20,13 @@ class EventListener {
         private const val PLUGIN_CONFLICT_MESSAGE = "登录失败：检测到插件冲突。"
     }
 
+    // OpenPreLogin handling has been moved to the auth-offline module to centralize offline matching.
+
     @Subscribe
-    fun onPreLogin(event: OpenPreLoginEvent) {
-        val uuid = event.uuid
-        val name = event.userName
-        val host = event.host
-//        初始化一些channel信息
+    fun onPreLoginChannelInit(event: OpenPreLoginEvent) {
+        // channel/player initialization belongs to core. Keep this call here to guarantee
+        // HyperZonePlayerManager state exists before other listeners (e.g. auth-offline) run.
         HyperZonePlayerManager.create(event.channel, event.userName, event.uuid)
-
-//        后面是进行离线UUID匹配
-        if (!HyperZoneLoginMain.getOfflineMatchConfig().enable) return
-        val offlineHost = HyperZoneLoginMain.getInstance().loginServerManager.shouldOfflineHost(host)
-        if (offlineHost) {
-            info { "匹配到离线 host 玩家: $name" }
-        }
-        val offlineUUIDType = ExtraUuidUtils.matchType(uuid, name)
-
-        if (offlineUUIDType != OfflineUUIDType.UNKNOWN || offlineHost) {
-            event.isOnline = false
-        } else {
-            event.isOnline = true
-        }
-        info { "传入 UUID 信息玩家: $name UUID:$uuid 类型: $offlineUUIDType 在线:${event.isOnline}" }
     }
 
     @Subscribe
