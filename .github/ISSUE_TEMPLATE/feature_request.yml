@@ -1,0 +1,70 @@
+name: 功能建议
+description: 为 HyperZoneLogin 提出新的功能建议或改进想法。
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请尽量从“使用场景 → 当前问题 → 预期方案”的角度描述需求。
+        如果这项建议与登录方式、Profile、迁移、皮肤链路或代理部署有关，请一并说明。
+
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 使用场景
+      description: 你准备把这个功能用在什么服务器环境中？
+      placeholder: |
+        例：
+        - Velocity 代理 + 2 台后端服
+        - 同时支持 Mojang、LittleSkin 与离线玩家
+        - 正从 AuthMe / MultiLogin 迁移
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: 当前痛点
+      description: 现在缺少什么能力，导致你需要这个功能？
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 希望的解决方案
+      description: 你理想中的行为是什么？
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 你尝试过的替代方案
+      description: 包括现有配置、其他插件、脚本或手工流程
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: affected-area
+    attributes:
+      label: 涉及模块（可多选）
+      options:
+        - label: openvc / 核心模块
+        - label: auth-yggd
+        - label: auth-offline
+        - label: data-merge
+        - label: profile-skin
+        - label: 文档
+        - label: GitHub 工作流 / 发布流程
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 其他补充
+      description: 可补充命令设计、配置草案、兼容性顾虑等
+    validations:
+      required: false
+

@@ -1,0 +1,64 @@
+name: 使用 / 配置问题
+description: 对 HyperZoneLogin 的安装、配置或模块选择有疑问时使用。
+title: "[Question]: "
+labels:
+  - question
+body:
+  - type: markdown
+    attributes:
+      value: |
+        如果你还没有阅读用户手册，请先从 `用户手册/README.md` 开始。
+        为了让问题更容易得到解答，请尽量一次性补全你的环境与目标。
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: 你的目标
+      description: 你想实现什么部署效果？
+      placeholder: |
+        例：
+        - 只允许 Mojang / LittleSkin 玩家登录
+        - 同时支持离线 + 正版 + 第三方皮肤站
+        - 从 AuthMe / MultiLogin 迁移旧数据
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-setup
+    attributes:
+      label: 当前环境
+      description: 请说明代理、后端、数据库、已安装模块与关键配置
+      placeholder: |
+        例：
+        - Velocity 3.x
+        - Paper 1.20.4
+        - 已安装 openvc + auth-yggd
+        - 数据库使用 SQLite
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: 具体问题
+      description: 请把问题描述得尽量明确，不要只写“怎么用”
+    validations:
+      required: true
+
+  - type: textarea
+    id: manual-read
+    attributes:
+      label: 你已经看过哪些文档
+      description: 请列出你已经阅读过的手册章节或 README，避免重复回答
+      placeholder: 例如 1服务器基础配置、2模块介绍、auth-yggd/README.md
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 其他补充
+      description: 可附上相关配置片段、日志、错误截图说明等
+    validations:
+      required: false
+

@@ -1,0 +1,68 @@
+name: Weekly Release
+
+on:
+  schedule:
+    - cron: '0 18 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Compute weekly tag
+        id: meta
+        run: |
+          TAG="weekly-$(date -u +%G).W$(date -u +%V)"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "name=HyperZoneLogin $TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Build plugin jars
+        run: ./gradlew clean build
+
+      - name: Update weekly tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -f "${{ steps.meta.outputs.tag }}"
+          git push origin "refs/tags/${{ steps.meta.outputs.tag }}" --force
+
+      - name: Publish weekly prerelease
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.name }}
+          prerelease: true
+          allowUpdates: true
+          artifactErrorsFailBuild: true
+          removeArtifacts: true
+          artifacts: |
+            build/HZL/*
+          body: |
+            This is an automatically generated weekly prerelease build for HyperZoneLogin.
+
+            Included artifacts are collected from `build/HZL/`.
+
+            If you encounter issues, please open an Issue and include environment, modules, logs, config snippets, and reproduction steps.
+          generateReleaseNotes: true
+

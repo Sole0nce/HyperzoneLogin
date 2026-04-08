@@ -1,0 +1,211 @@
+name: Bug 反馈
+description: 报告 HyperZoneLogin 中可复现的问题，请尽量一次性补全环境、日志与配置信息。
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提交前请先确认：
+        - 你已经阅读过 `用户手册/5问题反馈.md`
+        - 你已经检查过基础代理转发与模块安装
+        - 你能提供复现步骤，而不仅仅是“不能用”
+
+        信息越完整，问题越容易定位。
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已经阅读过用户手册中与当前问题相关的章节
+          required: true
+        - label: 我已经确认 Velocity 与后端服的基础配置无明显错误
+          required: true
+        - label: 我已阅读现有 Issue，确认这不是重复反馈
+          required: true
+
+  - type: input
+    id: hzl-version
+    attributes:
+      label: HyperZoneLogin 主插件版本
+      description: 例如 `1.0.0-SNAPSHOT`、weekly 版本号或具体 commit
+      placeholder: 例如 1.0.0-SNAPSHOT / weekly-2026.W15
+    validations:
+      required: true
+
+  - type: input
+    id: modules-version
+    attributes:
+      label: 已安装模块及版本
+      description: 请列出已安装的 `auth-yggd`、`auth-offline`、`data-merge`、`profile-skin` 等模块版本
+      placeholder: |
+        HyperZoneLogin-1.0.0-SNAPSHOT
+        HZL-auth-yggd-1.0.0-SNAPSHOT
+        HZL-auth-offline-1.0.0-SNAPSHOT
+    validations:
+      required: true
+
+  - type: input
+    id: velocity-version
+    attributes:
+      label: Velocity 版本
+      placeholder: 例如 3.3.0-SNAPSHOT
+    validations:
+      required: true
+
+  - type: input
+    id: backend-version
+    attributes:
+      label: 后端服务端版本
+      description: 请写明服务端实现与版本，例如 Paper / Purpur / Leaves
+      placeholder: 例如 Paper 1.20.4 build-xxx
+    validations:
+      required: true
+
+  - type: dropdown
+    id: forwarding-mode
+    attributes:
+      label: 代理转发模式
+      options:
+        - modern
+        - legacy
+        - bungeeguard
+        - none
+        - 不确定
+    validations:
+      required: true
+
+  - type: dropdown
+    id: database-type
+    attributes:
+      label: 当前数据库类型
+      options:
+        - SQLITE
+        - MYSQL
+        - MARIADB
+        - H2
+        - 不确定
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: installed-modules
+    attributes:
+      label: 已安装模块
+      options:
+        - label: auth-yggd
+        - label: auth-offline
+        - label: data-merge
+        - label: profile-skin
+        - label: 仅主插件
+
+  - type: textarea
+    id: topology
+    attributes:
+      label: 部署结构
+      description: 请说明代理与后端结构、是否使用认证等待区、是否使用 limboapi、是否接入第三方 Yggdrasil 等
+      placeholder: |
+        例：
+        - 1 台 Velocity 代理，2 台后端服（lobby / play）
+        - 未安装 limboapi，fallback-auth-server=lobby
+        - 使用 Mojang + LittleSkin 双 Entry
+    validations:
+      required: true
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: 问题类型
+      options:
+        - 登录失败
+        - 离线账号相关
+        - Yggdrasil / Entry 验证相关
+        - 皮肤异常
+        - 数据迁移相关
+        - 跳服 / 认证等待区相关
+        - 配置加载异常
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 请按顺序写出从启动服务到问题出现的完整步骤
+      placeholder: |
+        1. 启动代理和后端服
+        2. 玩家使用 XXX 方式连接
+        3. 执行 XXX / 进入 XXX 服务器
+        4. 出现问题
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期结果
+      placeholder: 例如 玩家应当成功认证并进入 play 服
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际结果
+      placeholder: 例如 玩家停留在等待区 / 被踢出 / 皮肤未生效 / 迁移中断
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 相关日志
+      description: 请粘贴完整报错、关键堆栈，或附上 `merge-ml.log` / `merge-am.log` 关键片段
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: config-snippets
+    attributes:
+      label: 相关配置片段
+      description: 请提供与问题直接相关的配置，例如 `database.conf`、`backend-server.conf`、`entry/*.conf`、`offlinematch.conf`、`profile-skin.conf`
+      render: hocon
+    validations:
+      required: true
+
+  - type: textarea
+    id: migration-info
+    attributes:
+      label: 若与迁移相关，请补充原始来源与迁移配置
+      description: 如果问题涉及迁移，请说明来源插件、旧库类型、表名、是否改过 `service-id-mapping`
+      placeholder: |
+        来源：AuthMe / MultiLogin
+        旧库：SQLite / MySQL / H2
+        迁移配置：是否改过默认表名与 service-id-mapping
+    validations:
+      required: false
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: 已尝试的排查
+      description: 请说明你已经做过哪些检查，避免重复建议
+      placeholder: |
+        - 已检查 forwarding.secret 与 paper-global.yml secret 一致
+        - 已确认安装了 auth-yggd 与 auth-offline
+        - 已重启而不是仅热重载
+    validations:
+      required: true
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: 其他补充信息
+      description: 可补充截图说明、特殊网络环境、代理设置、是否仅特定玩家受影响等
+    validations:
+      required: false
+
