@@ -139,21 +139,13 @@ class ToBackendPacketReplacer(
     }
 
     private fun shouldBypassForLoginServer(): Boolean {
-        val loginServerName = HyperZoneLoginMain.getMiscConfig().fallbackAuthServer.trim()
+        val loginServerName = HyperZoneLoginMain.getBackendServerConfig().fallbackAuthServer.trim()
         if (loginServerName.isBlank()) {
             return false
         }
 
-        val connectedServerName = player.connectedServer
-            ?.server
-            ?.serverInfo
-            ?.name
-        if (connectedServerName.equals(loginServerName, ignoreCase = true)) {
-            return true
-        }
-
-        val targetServerName = velocityServerConnection.server.serverInfo.name
-        return targetServerName.equals(loginServerName, ignoreCase = true)
+        val currentServerName = velocityServerConnection.server.serverInfo.name
+        return currentServerName.equals(loginServerName, ignoreCase = true)
     }
 
     private fun genLoginPluginResponse(

@@ -17,6 +17,7 @@ import icu.h2l.api.player.HyperZonePlayerAccessorProvider
 // Module implementations (auth-offline, auth-yggd, data-merge) are now separate plugins
 // and will register themselves with the main plugin at runtime. Do not import them here.
 import icu.h2l.login.command.HyperZoneLoginCommand
+import icu.h2l.login.config.BackendServerConfig
 import icu.h2l.login.config.DatabaseSourceConfig
 import icu.h2l.login.config.RemapConfig
 import icu.h2l.login.config.MiscConfig
@@ -62,6 +63,7 @@ class HyperZoneLoginMain @Inject constructor(
         private lateinit var databaseSourceConfig: DatabaseSourceConfig
         private lateinit var remapConfig: RemapConfig
         private lateinit var miscConfig: MiscConfig
+        private lateinit var backendServerConfig: BackendServerConfig
 
         @JvmStatic
         fun getInstance(): HyperZoneLoginMain = instance
@@ -74,6 +76,9 @@ class HyperZoneLoginMain @Inject constructor(
 
         @JvmStatic
         fun getMiscConfig(): MiscConfig = miscConfig
+
+        @JvmStatic
+        fun getBackendServerConfig(): BackendServerConfig = backendServerConfig
     }
 
     init {
@@ -86,6 +91,7 @@ class HyperZoneLoginMain @Inject constructor(
         loadDatabaseConfig()
         loadRemapConfig()
         loadMiscConfig()
+        loadBackendServerConfig()
         connectDatabase()
         // 创建基础表（Profile 表等）
         createBaseTables()
@@ -108,7 +114,7 @@ class HyperZoneLoginMain @Inject constructor(
         } else {
             // No limbo present; bind null adapter so command registration is a no-op
             HyperChatCommandManagerImpl.bindLimbo(proxy, null)
-            val configuredFallback = miscConfig.fallbackAuthServer.trim()
+            val configuredFallback = backendServerConfig.fallbackAuthServer.trim()
             if (configuredFallback.isNotBlank()) {
                 val backendHold = BackendAuthHoldListener(server)
                 backendAuthHoldListener = backendHold
@@ -266,6 +272,37 @@ class HyperZoneLoginMain @Inject constructor(
         }
         if (config != null) {
             miscConfig = config
+        }
+    }
+
+    private fun loadBackendServerConfig() {
+        val path = dataDirectory.resolve("backend-server.conf")
+        val firstCreation = Files.notExists(path)
+        val loader = HoconConfigurationLoader.builder()
+            .defaultOptions { opts: ConfigurationOptions ->
+                opts
+                    .shouldCopyDefaults(true)
+                    .header(
+                        """
+                            HyperZoneLogin Backend Server Configuration | by ksqeib
+                            
+                        """.trimIndent()
+                    ).serializers { s ->
+                        s.registerAnnotatedObjects(
+                            ObjectMapper.factoryBuilder().addDiscoverer(dataClassFieldDiscoverer()).build()
+                        )
+                    }
+            }
+            .path(path)
+            .build()
+        val node = loader.load()
+        val config = node.get(BackendServerConfig::class.java)
+        if (firstCreation) {
+            node.set(config)
+            loader.save(node)
+        }
+        if (config != null) {
+            backendServerConfig = config
         }
     }
 

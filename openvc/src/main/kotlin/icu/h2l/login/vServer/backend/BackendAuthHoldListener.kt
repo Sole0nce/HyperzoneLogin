@@ -13,6 +13,7 @@ import icu.h2l.login.HyperZoneLoginMain
 import icu.h2l.login.manager.HyperZonePlayerManager
 import icu.h2l.login.player.OpenVcHyperZonePlayer
 import net.kyori.adventure.text.Component
+import java.util.Locale
 
 /**
  * Fallback auth hold flow used when Limbo is unavailable.
@@ -140,10 +141,11 @@ class BackendAuthHoldListener(
         authServer: RegisteredServer,
         targetServerName: String?
     ): Boolean {
+        val resolvedTarget = resolvePostAuthTarget(player, authServer, targetServerName)
         hyperPlayer.update(player)
         hyperPlayer.beginBackendAuthHold(
             authServerName = authServer.serverInfo.name,
-            targetServerName = if (rememberRequestedServerDuringAuth()) targetServerName else null
+            targetServerName = resolvedTarget
         )
 
         val authStartEvent = VServerAuthStartEvent(player, hyperPlayer)
@@ -153,6 +155,49 @@ class BackendAuthHoldListener(
             return false
         }
         return true
+    }
+
+    private fun resolvePostAuthTarget(
+        player: Player,
+        authServer: RegisteredServer,
+        preferredTargetServerName: String?
+    ): String? {
+        val authServerName = authServer.serverInfo.name
+
+        val directTarget = preferredTargetServerName
+            ?.takeUnless { it.isBlank() || it.equals(authServerName, ignoreCase = true) }
+            ?.takeIf { server.getServer(it).isPresent }
+        if (directTarget != null) {
+            return directTarget
+        }
+
+        val configuredDefaultTarget = HyperZoneLoginMain.getBackendServerConfig().postAuthDefaultServer
+            .trim()
+            .takeUnless { it.isBlank() || it.equals(authServerName, ignoreCase = true) }
+            ?.takeIf { server.getServer(it).isPresent }
+        if (configuredDefaultTarget != null) {
+            return configuredDefaultTarget
+        }
+
+        val config = server.configuration
+        val hostKey = player.virtualHost
+            .map { it.hostString.lowercase(Locale.ROOT) }
+            .orElse("")
+        val forcedOrder = config.forcedHosts[hostKey].orEmpty()
+        val connectionOrder = if (forcedOrder.isNotEmpty()) {
+            forcedOrder
+        } else {
+            config.attemptConnectionOrder
+        }
+
+        connectionOrder.firstOrNull { candidate ->
+            !candidate.equals(authServerName, ignoreCase = true) && server.getServer(candidate).isPresent
+        }?.let { return it }
+
+        return server.getAllServers()
+            .firstOrNull { candidate -> !candidate.serverInfo.name.equals(authServerName, ignoreCase = true) }
+            ?.serverInfo
+            ?.name
     }
 
     private fun fireJoinIfNeeded(
@@ -174,11 +219,11 @@ class BackendAuthHoldListener(
     }
 
     private fun configuredAuthServerName(): String {
-        return HyperZoneLoginMain.getMiscConfig().fallbackAuthServer.trim()
+        return HyperZoneLoginMain.getBackendServerConfig().fallbackAuthServer.trim()
     }
 
     private fun rememberRequestedServerDuringAuth(): Boolean {
-        return HyperZoneLoginMain.getMiscConfig().rememberRequestedServerDuringAuth
+        return HyperZoneLoginMain.getBackendServerConfig().rememberRequestedServerDuringAuth
     }
 
     private fun resolveAuthServer(): RegisteredServer? {

@@ -29,8 +29,9 @@ openvc / 主插件 (HyperZoneLogin 核心)
   - 子模块可以监听并响应这些事件进行表的创建或清理。
 
 - 无 `limboapi` 时的认证等待区：
-  - 可在 `misc.conf` 中配置 `fallbackAuthServer` 为一个真实后端服务器名；
+  - 可在 `backend-server.conf` 中配置 `fallbackAuthServer` 为一个真实后端服务器名；
   - 当未安装 `limboapi` 时，未认证玩家会被固定送入该服务器等待认证；
+  - 可通过 `postAuthDefaultServer` 配置认证完成后��先进入的子服务器，默认 `play`；
   - 认证完成前，玩家不能进入其他后端；
   - 若 `rememberRequestedServerDuringAuth=true`，则会记住玩家原本想去的服务器，并在认证成功后自动连接过去。
 
