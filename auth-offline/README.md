@@ -9,7 +9,7 @@ Auth Offline 模块 (hzl-auth-offline)
 -----------------------------------
 - 将本模块作为单独的 Velocity 插件放入 `plugins/` 文件夹（插件 id 为 `hzl-auth-offline`）。
 - 在运行时，本模块会检测主插件 `hyperzonelogin` 是否存在；若存在会直接调用主插件的 API：`HyperZoneLoginMain.getInstance().registerModule(OfflineSubModule())` 完成集成。
-- 本模块依赖主插件在运行时提供的 API（`api` 项目由 `openvc` 提供），因此必须确保主插件已加载。
+- 本模块依赖主插件在运行时提供的 API（`api` 项目由 `velocity` 模块在运行时提供），因此必须确保主插件已加载。
 
 主要功能与技术细节
 -----------------
@@ -56,7 +56,7 @@ Auth Offline 模块 (hzl-auth-offline)
 
 注意事项
 ---------
-- 本模块不打包 `api`；运行时必须由 `openvc`或主插件提供 API。若未找到主插件，会在初始化时打印警告并在主插件就绪后尝试注册。
+- 本模块不打包 `api`；运行时必须由 `velocity` 主模块或主插件提供 API。若未找到主插件，会在初始化时打印警告并在主插件就绪后尝试注册。
 - 密码兼容注意：如果你从其他插件迁移数据，`authme` 格式会被识别并验证，但建议统一迁移为 sha256 以获得一致性和更简单的实现。
 
 开发者提示

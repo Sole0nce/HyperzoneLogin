@@ -6,13 +6,13 @@ import com.velocitypowered.api.proxy.Player
 import icu.h2l.api.player.HyperZonePlayer
 import icu.h2l.api.player.HyperZonePlayerAccessor
 import icu.h2l.api.player.getChannel
-import icu.h2l.login.player.OpenVcHyperZonePlayer
+import icu.h2l.login.player.VelocityHyperZonePlayer
 import io.netty.channel.Channel
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
 object HyperZonePlayerManager : HyperZonePlayerAccessor {
-    private val playersByPlayer = ConcurrentHashMap<Channel, OpenVcHyperZonePlayer>()
+    private val playersByPlayer = ConcurrentHashMap<Channel, VelocityHyperZonePlayer>()
 
     override fun create(channel: Channel, userName: String, uuid: UUID, isOnline: Boolean): HyperZonePlayer {
         return playersByPlayer.compute(channel) { _, existing ->
@@ -20,7 +20,7 @@ object HyperZonePlayerManager : HyperZonePlayerAccessor {
                 existing.setOnlinePlayer(isOnline)
                 existing
             } else {
-                OpenVcHyperZonePlayer(userName, uuid, isOnline)
+                VelocityHyperZonePlayer(userName, uuid, isOnline)
             }
         }!!
     }

@@ -13,7 +13,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
-class OpenVcHyperZonePlayer(
+class VelocityHyperZonePlayer(
 //    最开始客户端传入的，不可信
     override var userName: String,
     override var uuid: UUID,
@@ -257,3 +257,4 @@ class OpenVcHyperZonePlayer(
         authJoinAnnounced.set(false)
     }
 }
+

@@ -1,5 +1,5 @@
 plugins {
-    alias(libs.plugins.kotlin)
+    id("org.jetbrains.kotlin.jvm")
 }
 
 group = "icu.h2l.login"
@@ -16,9 +16,9 @@ dependencies {
     compileOnly(project(":api"))
     // Direct reference to the main plugin module so we can call its API
     // (e.g. HyperZoneLoginMain.getInstance().registerModule(...)) without reflection.
-    compileOnly(project(":openvc"))
+    compileOnly(project(":velocity"))
 //    VC
-    compileOnly("com.velocitypowered:velocity-api:3.4.0-SNAPSHOT")
+    compileOnly("com.velocitypowered:velocity-api:3.5.0-SNAPSHOT")
     // Exposed ORM
     compileOnly("org.jetbrains.exposed:exposed-core:0.58.0")
 //    config

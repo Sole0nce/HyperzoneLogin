@@ -1,6 +1,6 @@
 plugins {
-    alias(libs.plugins.kotlin)
-    alias(libs.plugins.shadow)
+    id("org.jetbrains.kotlin.jvm")
+    id("com.github.johnrengelman.shadow")
 }
 
 dependencies {
@@ -39,7 +39,7 @@ dependencies {
     compileOnly("com.google.guava:guava:33.4.0-jre")
     compileOnly(libs.brigadier)
 
-    annotationProcessor("com.velocitypowered:velocity-api:3.4.0-SNAPSHOT")
+    annotationProcessor("com.velocitypowered:velocity-api:3.5.0-SNAPSHOT")
 
     testImplementation(platform("org.junit:junit-bom:5.10.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")

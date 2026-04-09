@@ -2,7 +2,7 @@ import org.gradle.jvm.tasks.Jar
 import org.gradle.api.publish.maven.MavenPublication
 
 plugins {
-    alias(libs.plugins.kotlin)
+    id("org.jetbrains.kotlin.jvm")
     id("maven-publish")
 }
 
@@ -16,8 +16,8 @@ repositories {
 
 dependencies {
 //    VC
-    compileOnly("com.velocitypowered:velocity-api:3.4.0-SNAPSHOT")
-    compileOnly("com.velocitypowered:velocity-proxy:3.4.0-SNAPSHOT")
+    compileOnly("com.velocitypowered:velocity-api:3.5.0-SNAPSHOT")
+    compileOnly("com.velocitypowered:velocity-proxy:3.5.0-SNAPSHOT")
 // Limbo is optional; implementations may provide a bridge adapter. Do not
 // require the limbo API here at compile time.
     // Netty is needed by API types (connection/player extensions) but only at compile time

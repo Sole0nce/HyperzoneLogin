@@ -8,7 +8,7 @@ import icu.h2l.api.log.info as apiInfo
 
 private const val DEBUG_MESSAGE_PREFIX = "[DEBUG] "
 
-private object OpenVcLoggerBridge : HyperZoneLogger {
+private object VelocityLoggerBridge : HyperZoneLogger {
     override fun info(message: String) {
         val logger = HyperZoneLoginMain.getInstance().logger
         if (logger.isInfoEnabled) {
@@ -36,7 +36,7 @@ private object OpenVcLoggerBridge : HyperZoneLogger {
 }
 
 fun registerApiLogger() {
-    HyperZoneLogApi.registerLogger(OpenVcLoggerBridge)
+    HyperZoneLogApi.registerLogger(VelocityLoggerBridge)
 }
 
 internal inline fun info(block: () -> String) {

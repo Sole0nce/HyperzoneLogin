@@ -1,5 +1,5 @@
 plugins {
-    alias(libs.plugins.kotlin)
+    id("org.jetbrains.kotlin.jvm")
 }
 
 group = "icu.h2l.login"
@@ -13,10 +13,10 @@ dependencies {
     // Build as standalone plugin; api is provided at runtime by the main plugin
     compileOnly(project(":api"))
     // Direct reference to the main plugin to call its API without reflection
-    compileOnly(project(":openvc"))
+    compileOnly(project(":velocity"))
 //    VC
-    compileOnly("com.velocitypowered:velocity-api:3.4.0-SNAPSHOT")
-    compileOnly("com.velocitypowered:velocity-proxy:3.4.0-SNAPSHOT") // From Elytrium Repo.
+    compileOnly("com.velocitypowered:velocity-api:3.5.0-SNAPSHOT")
+    compileOnly("com.velocitypowered:velocity-proxy:3.5.0-SNAPSHOT") // From Elytrium Repo.
     compileOnly("io.netty:netty-all:4.2.5.Final")
 // Exposed ORM
     compileOnly("org.jetbrains.exposed:exposed-core:0.58.0")

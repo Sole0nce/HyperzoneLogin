@@ -28,7 +28,7 @@
 
 当前仓库主要由以下模块组成：
 
-- `openvc`：主插件 / 核心模块，负责 Profile、数据库、命令与模块注册；
+- `velocity`：主插件 / 核心模块，负责 Profile、数据库、命令与模块注册；
 - `auth-yggd`：Yggdrasil 在线验证模块，适用于 Mojang 与第三方皮肤站；
 - `auth-offline`：离线 / 本地账号模块，适用于混合登录场景；
 - `data-merge`：数据迁移模块，用于从 AuthMe、MultiLogin 导入历史数据；

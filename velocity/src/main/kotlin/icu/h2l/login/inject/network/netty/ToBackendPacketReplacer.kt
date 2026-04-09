@@ -26,7 +26,7 @@ import icu.h2l.login.HyperZoneLoginMain
 import icu.h2l.login.inject.network.ChatSessionUpdatePacketIdResolver
 import icu.h2l.login.manager.HyperZonePlayerManager
 import icu.h2l.login.player.ForwardingGameProfileSupport
-import icu.h2l.login.player.OpenVcHyperZonePlayer
+import icu.h2l.login.player.VelocityHyperZonePlayer
 import io.netty.buffer.ByteBuf
 import io.netty.channel.Channel
 import io.netty.channel.ChannelHandlerContext
@@ -53,7 +53,7 @@ class ToBackendPacketReplacer(
     private fun replaceMessage(
         msg: Any?
     ): Any? {
-        val offlinePlayer = (hyperPlayer as? OpenVcHyperZonePlayer)?.isOnlinePlayer() == false
+        val offlinePlayer = (hyperPlayer as? VelocityHyperZonePlayer)?.isOnlinePlayer() == false
         val loginServerTarget = isLoginServerTarget()
 
         if (msg is HandshakePacket || msg is ServerLoginPacket || msg is LoginPluginResponsePacket) {

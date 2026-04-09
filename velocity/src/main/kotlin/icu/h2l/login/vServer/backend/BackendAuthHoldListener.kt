@@ -11,7 +11,7 @@ import icu.h2l.api.event.vServer.VServerAuthStartEvent
 import icu.h2l.api.event.vServer.VServerJoinEvent
 import icu.h2l.login.HyperZoneLoginMain
 import icu.h2l.login.manager.HyperZonePlayerManager
-import icu.h2l.login.player.OpenVcHyperZonePlayer
+import icu.h2l.login.player.VelocityHyperZonePlayer
 import net.kyori.adventure.text.Component
 import java.util.Locale
 
@@ -137,7 +137,7 @@ class BackendAuthHoldListener(
 
     private fun startAuthHold(
         player: Player,
-        hyperPlayer: OpenVcHyperZonePlayer,
+        hyperPlayer: VelocityHyperZonePlayer,
         authServer: RegisteredServer,
         targetServerName: String?
     ): Boolean {
@@ -202,7 +202,7 @@ class BackendAuthHoldListener(
 
     private fun fireJoinIfNeeded(
         player: Player,
-        hyperPlayer: OpenVcHyperZonePlayer,
+        hyperPlayer: VelocityHyperZonePlayer,
         server: RegisteredServer
     ) {
         if (!hyperPlayer.markBackendAuthJoinHandled(server.serverInfo.name)) {
@@ -212,9 +212,9 @@ class BackendAuthHoldListener(
         this.server.eventManager.fire(VServerJoinEvent(player, hyperPlayer))
     }
 
-    private fun getHyperPlayer(player: Player): OpenVcHyperZonePlayer? {
+    private fun getHyperPlayer(player: Player): VelocityHyperZonePlayer? {
         return runCatching {
-            HyperZonePlayerManager.getByPlayer(player) as OpenVcHyperZonePlayer
+            HyperZonePlayerManager.getByPlayer(player) as VelocityHyperZonePlayer
         }.getOrNull()
     }
 

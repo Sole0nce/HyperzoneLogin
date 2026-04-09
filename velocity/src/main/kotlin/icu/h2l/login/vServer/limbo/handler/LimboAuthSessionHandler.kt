@@ -4,7 +4,7 @@ import com.velocitypowered.api.proxy.Player
 import icu.h2l.api.event.vServer.VServerJoinEvent
 import icu.h2l.api.player.HyperZonePlayer
 import icu.h2l.login.HyperZoneLoginMain
-import icu.h2l.login.player.OpenVcHyperZonePlayer
+import icu.h2l.login.player.VelocityHyperZonePlayer
 import net.elytrium.limboapi.api.Limbo
 import net.elytrium.limboapi.api.LimboSessionHandler
 import net.elytrium.limboapi.api.player.LimboPlayer
@@ -15,7 +15,7 @@ class LimboAuthSessionHandler(
 ) : LimboSessionHandler {
 
     override fun onSpawn(server: Limbo, player: LimboPlayer) {
-        (hyperZonePlayer as OpenVcHyperZonePlayer).onSpawn(player)
+        (hyperZonePlayer as VelocityHyperZonePlayer).onSpawn(player)
         player.disableFalling()
 
         HyperZoneLoginMain.getInstance().proxy.eventManager.fire(

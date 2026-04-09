@@ -1,9 +1,9 @@
-openvc / 主插件 (HyperZoneLogin 核心)
+velocity / 主插件 (HyperZoneLogin 核心)
 ===================================
 
 目的
 ----
-`openvc` 是 HyperZoneLogin 的主插件/核心模块，负责：
+`velocity` 是 HyperZoneLogin 的主插件/核心模块，负责：
 - 档案（Profile）管理（注册、查找与绑定）；
 - 提供主运行时的 API（例如 `HyperZoneLoginMain`、数据库管理、命令/事件集成点）给其他子模块使用；
 - 提供基础数据库接口与部分工具（如离线 UUID 识别与 profile 表定义）。

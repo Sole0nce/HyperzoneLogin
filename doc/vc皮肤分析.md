@@ -2,7 +2,7 @@
 
 ## 背景
 
-当前 `openvc` 里的皮肤相关尝试，核心目标是：
+当前 `velocity` 模块里的皮肤相关尝试，核心目标是：
 
 1. 登录阶段继续使用随机 `GameProfile`（例如 `hzl-login-xxxxxx`）以满足前置一致性校验；
 2. 但仍然希望客户端能够显示正确皮肤；
@@ -22,7 +22,7 @@
 
 ### 1. 登录阶段强制使用随机档案
 
-`openvc/src/main/kotlin/icu/h2l/login/listener/EventListener.kt`
+`velocity/src/main/kotlin/icu/h2l/login/listener/EventListener.kt`
 
 - `onStartAuth(event: OpenStartAuthEvent)` 中会生成 `RemapUtils.randomProfile()`；
 - 该随机 profile 会写入 `event.gameProfile`；
@@ -40,7 +40,7 @@
 
 项目中皮肤修复的职责主要在：
 
-- `openvc/src/main/kotlin/icu/h2l/login/player/ProfileSkinApplySupport.kt`
+- `velocity/src/main/kotlin/icu/h2l/login/player/ProfileSkinApplySupport.kt`
 - `profile-skin/src/main/kotlin/icu/h2l/login/profile/skin/service/ProfileSkinService.kt`
 
 这条链路的作用是：
@@ -241,7 +241,7 @@ ProtocolUtils.writeProperties(buf, info.profile.getProperties());
 
 ### 结论 1：`SelfSkinTabListManager` 不是正解
 
-`openvc/src/main/kotlin/icu/h2l/login/manager/SelfSkinTabListManager.kt`
+`velocity/src/main/kotlin/icu/h2l/login/manager/SelfSkinTabListManager.kt`
 
 这个方案的问题在于：
 
@@ -313,10 +313,10 @@ ProtocolUtils.writeProperties(buf, info.profile.getProperties());
 ## 对应源码位置索引
 
 ### 项目内
-- `openvc/src/main/kotlin/icu/h2l/login/listener/EventListener.kt`
-- `openvc/src/main/kotlin/icu/h2l/login/player/ProfileSkinApplySupport.kt`
-- `openvc/src/main/kotlin/icu/h2l/login/manager/SelfSkinTabListManager.kt`
-- `openvc/src/main/kotlin/icu/h2l/login/inject/network/netty/ToBackendPacketReplacer.kt`
+- `velocity/src/main/kotlin/icu/h2l/login/listener/EventListener.kt`
+- `velocity/src/main/kotlin/icu/h2l/login/player/ProfileSkinApplySupport.kt`
+- `velocity/src/main/kotlin/icu/h2l/login/manager/SelfSkinTabListManager.kt`
+- `velocity/src/main/kotlin/icu/h2l/login/inject/network/netty/ToBackendPacketReplacer.kt`
 
 ### Velocity 源码
 - `ref/Velocity/proxy/src/main/java/com/velocitypowered/proxy/connection/client/AuthSessionHandler.java`

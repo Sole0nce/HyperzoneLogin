@@ -3,7 +3,7 @@ package icu.h2l.login.vServer.limbo.command
 import com.velocitypowered.api.command.SimpleCommand
 import com.velocitypowered.api.proxy.Player
 import icu.h2l.login.manager.HyperZonePlayerManager
-import icu.h2l.login.player.OpenVcHyperZonePlayer
+import icu.h2l.login.player.VelocityHyperZonePlayer
 import net.kyori.adventure.text.Component
 
 class ExitLimboCommand : SimpleCommand {
@@ -20,7 +20,7 @@ class ExitLimboCommand : SimpleCommand {
             return
         }
 
-        (hyperZonePlayer as OpenVcHyperZonePlayer).exitLimbo()
+        (hyperZonePlayer as VelocityHyperZonePlayer).exitLimbo()
         source.sendMessage(Component.text("§a已尝试退出认证服务器"))
     }
 

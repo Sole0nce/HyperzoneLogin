@@ -7,7 +7,7 @@ import com.velocitypowered.api.proxy.ProxyServer
 import icu.h2l.api.command.HyperChatCommandManager
 import icu.h2l.api.command.HyperChatCommandRegistration
 import icu.h2l.api.vServer.HyperZoneVServerAdapter
-import icu.h2l.login.player.OpenVcHyperZonePlayer
+import icu.h2l.login.player.VelocityHyperZonePlayer
 import net.kyori.adventure.text.Component
 import java.util.concurrent.ConcurrentHashMap
 
@@ -110,7 +110,7 @@ object HyperChatCommandManagerImpl : HyperChatCommandManager {
                 }
 
                 val hyperPlayer = runCatching {
-                    HyperZonePlayerManager.getByPlayer(source) as OpenVcHyperZonePlayer
+                    HyperZonePlayerManager.getByPlayer(source) as VelocityHyperZonePlayer
                 }.getOrNull()
 
                 if (hyperPlayer == null || !hyperPlayer.isInBackendAuthHold()) {

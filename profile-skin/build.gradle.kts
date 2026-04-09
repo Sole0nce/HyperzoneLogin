@@ -1,5 +1,5 @@
 plugins {
-    alias(libs.plugins.kotlin)
+    id("org.jetbrains.kotlin.jvm")
 }
 
 group = "icu.h2l.login"
@@ -11,10 +11,10 @@ repositories {
 
 dependencies {
     compileOnly(project(":api"))
-    compileOnly(project(":openvc"))
+    compileOnly(project(":velocity"))
 
-    compileOnly("com.velocitypowered:velocity-api:3.4.0-SNAPSHOT")
-    compileOnly("com.velocitypowered:velocity-proxy:3.4.0-SNAPSHOT")
+    compileOnly("com.velocitypowered:velocity-api:3.5.0-SNAPSHOT")
+    compileOnly("com.velocitypowered:velocity-proxy:3.5.0-SNAPSHOT")
     compileOnly("org.jetbrains.exposed:exposed-core:0.58.0")
     compileOnly("org.spongepowered:configurate-hocon:4.2.0")
     compileOnly("org.spongepowered:configurate-extra-kotlin:4.2.0")

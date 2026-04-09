@@ -1,10 +1,30 @@
 import org.gradle.api.tasks.Sync
 import org.gradle.jvm.tasks.Jar
 
+buildscript {
+    repositories {
+        exclusiveContent {
+            forRepository {
+                maven("https://plugins.gradle.org/m2/")
+            }
+            filter {
+                includeGroup("com.github.johnrengelman")
+                includeGroup("com.github.johnrengelman.shadow")
+            }
+        }
+
+        maven("https://maven.aliyun.com/repository/central")
+        maven("https://mirrors.cloud.tencent.com/nexus/repository/maven-public/")
+        mavenCentral()
+    }
+    dependencies {
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.3.20")
+        classpath("com.github.johnrengelman:shadow:8.1.1")
+    }
+}
+
 plugins {
     base
-    alias(libs.plugins.kotlin) apply false
-    alias(libs.plugins.shadow) apply false
 }
 
 subprojects {
@@ -12,6 +32,8 @@ subprojects {
     version = "1.0-SNAPSHOT"
 
     repositories {
+        maven("https://maven.aliyun.com/repository/central")
+        maven("https://mirrors.cloud.tencent.com/nexus/repository/maven-public/")
         mavenCentral()
 
         maven("https://repo.papermc.io/repository/maven-public/")
@@ -24,15 +46,15 @@ val pluginBundleDir = layout.buildDirectory.dir("HZL")
 
 val collectPluginJars by tasks.registering(Sync::class) {
     group = "build"
-    description = "Collects all non-API plugin jars into one directory. openvc uses shadowJar; all other modules are prefixed with HZL-."
+    description = "Collects all non-API plugin jars into one directory. velocity uses shadowJar; all other modules are prefixed with HZL-."
     into(pluginBundleDir)
 
-    val openvcProject = project(":openvc")
-    dependsOn(openvcProject.tasks.named("shadowJar"))
-    from(openvcProject.tasks.named("shadowJar", Jar::class).flatMap { it.archiveFile })
+    val velocityProject = project(":velocity")
+    dependsOn(velocityProject.tasks.named("shadowJar"))
+    from(velocityProject.tasks.named("shadowJar", Jar::class).flatMap { it.archiveFile })
 
     subprojects
-        .filter { it.path != ":api" && it.path != ":openvc" }
+        .filter { it.path != ":api" && it.path != ":velocity" }
         .forEach { subproject ->
             dependsOn(subproject.tasks.named("jar"))
             from(subproject.tasks.named("jar", Jar::class).flatMap { it.archiveFile }) {
