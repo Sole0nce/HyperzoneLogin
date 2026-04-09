@@ -1,10 +1,73 @@
+/*
+ * This file is part of HyperZoneLogin, licensed under the GNU Affero General Public License v3.0 or later.
+ *
+ * Copyright (C) ksqeib (庆灵) <ksqeib@qq.com>
+ * Copyright (C) contributors
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ */
+
 import org.gradle.api.tasks.Sync
 import org.gradle.jvm.tasks.Jar
 
 plugins {
     base
+    alias(libs.plugins.spotless)
     alias(libs.plugins.kotlin) apply false
     alias(libs.plugins.shadow) apply false
+}
+
+fun toBlockCommentHeader(headerFile: java.io.File): String {
+    val body = headerFile
+        .readLines()
+        .dropLastWhile { it.isBlank() }
+        .joinToString("\n") { line -> if (line.isBlank()) " *" else " * $line" }
+
+    return "/*\n$body\n *\n */\n\n"
+}
+
+val kotlinLicenseHeader = toBlockCommentHeader(rootProject.file("HEADER.txt"))
+val kotlinSourceHeaderDelimiter = "^(package|@file:|import)"
+val kotlinGradleHeaderDelimiter = "^(import|plugins|buildscript|pluginManagement|dependencyResolutionManagement|rootProject|include)"
+
+spotless {
+    kotlin {
+        target(
+            "api/src/**/*.kt",
+            "auth-offline/src/**/*.kt",
+            "auth-yggd/src/**/*.kt",
+            "data-merge/src/**/*.kt",
+            "profile-skin/src/**/*.kt",
+            "velocity/src/**/*.kt",
+        )
+        licenseHeader(kotlinLicenseHeader, kotlinSourceHeaderDelimiter)
+    }
+
+    kotlinGradle {
+        target(
+            "build.gradle.kts",
+            "settings.gradle.kts",
+            "api/build.gradle.kts",
+            "auth-offline/build.gradle.kts",
+            "auth-yggd/build.gradle.kts",
+            "data-merge/build.gradle.kts",
+            "profile-skin/build.gradle.kts",
+            "velocity/build.gradle.kts",
+        )
+        licenseHeader(kotlinLicenseHeader, kotlinGradleHeaderDelimiter)
+    }
 }
 
 subprojects {
@@ -48,6 +111,10 @@ val collectPluginJars by tasks.registering(Sync::class) {
 
 tasks.named("assemble") {
     dependsOn(collectPluginJars)
+}
+
+tasks.named("check") {
+    dependsOn(tasks.named("spotlessCheck"))
 }
 
 tasks.named("build") {
