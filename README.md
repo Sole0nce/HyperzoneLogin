@@ -42,6 +42,7 @@
 - 首次启动需要能够访问 Maven 仓库镜像；
 - 下载后的 jar 会进行 SHA-256 校验；
 - 后续启动会优先复用本地缓存；
+- 主插件与子模块均不再要求额外安装 `MCKotlin-Velocity`；
 - 相关实现参考并改编自 LuckPerms，详见 [`THIRD_PARTY_NOTICES.md`](./THIRD_PARTY_NOTICES.md)。
 
 ## 当前已确认范围

@@ -7,7 +7,7 @@ shadow = "9.4.1"
 spotless = "7.2.1"
 configurate = "4.2.0"
 adventure = "4.19.0"
-kotlin = "2.3.20"   # max version of mckotlin-velocity
+kotlin = "2.3.20"
 
 exposed = "0.58.0"
 h2 = "2.1.214"

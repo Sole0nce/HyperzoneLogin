@@ -21,18 +21,11 @@
 
 package icu.h2l.login
 
-import com.google.inject.Inject
-import com.velocitypowered.api.event.Subscribe
 import com.velocitypowered.api.event.proxy.ProxyInitializeEvent
-import com.velocitypowered.api.plugin.annotation.DataDirectory
 import com.velocitypowered.api.proxy.ProxyServer
 import icu.h2l.api.HyperZoneApi
-import icu.h2l.api.HyperZoneApiProvider
 import icu.h2l.api.command.HyperChatCommandManager
 import icu.h2l.api.command.HyperChatCommandRegistration
-import icu.h2l.api.dependency.HyperDependencyManager
-import icu.h2l.api.dependency.HyperRuntimeLibraries
-import icu.h2l.api.dependency.VelocityHyperDependencyClassPathAppender
 import icu.h2l.api.vServer.HyperZoneVServerAdapter
 import icu.h2l.api.module.HyperSubModule
 import icu.h2l.api.player.HyperZonePlayerAccessor
@@ -62,20 +55,21 @@ import java.nio.file.Files
 import java.nio.file.Path
 
 @Suppress("ANNOTATION_WILL_BE_APPLIED_ALSO_TO_PROPERTY_OR_FIELD")
-class HyperZoneLoginMain @Inject constructor(
+class HyperZoneLoginMain(
     private val server: ProxyServer,
     val logger: ComponentLogger,
-    @DataDirectory override val dataDirectory: Path
-) : HyperZoneApi {
+    val dataDirectory: Path,
+    private val plugin: HyperZoneApi
+) {
     var limboServerManager: LimboVServerAuth? = null
     var backendAuthHoldListener: BackendAuthHoldListener? = null
-    override lateinit var databaseManager: icu.h2l.login.manager.DatabaseManager
+    lateinit var databaseManager: icu.h2l.login.manager.DatabaseManager
     lateinit var databaseHelper: DatabaseHelper
-    override val serverAdapter: HyperZoneVServerAdapter?
+    val serverAdapter: HyperZoneVServerAdapter?
         get() = limboServerManager
-    override val hyperZonePlayers: HyperZonePlayerAccessor
+    val hyperZonePlayers: HyperZonePlayerAccessor
         get() = HyperZonePlayerManager
-    override val chatCommandManager: HyperChatCommandManager
+    val chatCommandManager: HyperChatCommandManager
         get() = HyperChatCommandManagerImpl
 
 
@@ -101,13 +95,10 @@ class HyperZoneLoginMain @Inject constructor(
 
     init {
         instance = this
-        HyperZoneApiProvider.bind(this)
     }
 
     @Suppress("unused", "UNUSED_PARAMETER")
-    @Subscribe
     fun onEnable(event: ProxyInitializeEvent) {
-        loadRuntimeLibraries()
         registerApiLogger()
         loadDatabaseConfig()
         loadRemapConfig()
@@ -128,7 +119,7 @@ class HyperZoneLoginMain @Inject constructor(
                 // bind adapter (not the third-party Limbo type)
                 HyperChatCommandManagerImpl.bindLimbo(proxy, limbo)
                 HyperChatCommandManagerImpl.setProxyFallbackCommandsEnabled(false)
-                proxy.eventManager.register(this, limbo)
+                proxy.eventManager.register(plugin, limbo)
             } catch (t: Throwable) {
                 logger.warn("Limbo plugin detected but initialization failed: ${t.message}")
             }
@@ -140,7 +131,7 @@ class HyperZoneLoginMain @Inject constructor(
                 val backendHold = BackendAuthHoldListener(server)
                 backendAuthHoldListener = backendHold
                 HyperChatCommandManagerImpl.setProxyFallbackCommandsEnabled(true)
-                proxy.eventManager.register(this, backendHold)
+                proxy.eventManager.register(plugin, backendHold)
                 logger.info("Limbo not present; using backend auth hold server '$configuredFallback'")
             } else {
                 backendAuthHoldListener = null
@@ -158,26 +149,26 @@ class HyperZoneLoginMain @Inject constructor(
 
 //        最后加载模块
         // Keep internal modules that are part of the main plugin
-        registerModule(VelocityNetworkModule())
+        registerModule(VelocityNetworkModule(), plugin)
         // External modules (auth-offline, auth-yggd, data-merge) will be loaded as
         // separate Velocity plugins and should call `registerModule(...)` on this
         // main plugin during their own initialization.
         val hzlCommandMeta = proxy.commandManager.metaBuilder("hzl").build()
         proxy.commandManager.register(hzlCommandMeta, HyperZoneLoginCommand())
-        proxy.eventManager.register(this, EventListener())
-        proxy.eventManager.register(this, HyperZonePlayerManager)
+        proxy.eventManager.register(plugin, EventListener())
+        proxy.eventManager.register(plugin, HyperZonePlayerManager)
         // If Limbo was present, we've already registered its event listener above
 
         logInternalTestWarning()
 
     }
 
-    override val proxy: ProxyServer
+    val proxy: ProxyServer
         get() = server
 
-    override fun registerModule(module: HyperSubModule) {
+    fun registerModule(module: HyperSubModule, api: HyperZoneApi) {
         try {
-            module.register(this)
+            module.register(api)
             logger.info("模块加载成功: ${module.javaClass.name}")
         } catch (e: Exception) {
             logger.error("加载模块 ${module.javaClass.name} 失败: ${e.message}", e)
@@ -200,17 +191,6 @@ class HyperZoneLoginMain @Inject constructor(
         logger.warn("========================================")
     }
 
-    private fun loadRuntimeLibraries() {
-        try {
-            HyperDependencyManager(
-                dataDirectory.resolve("libs"),
-                VelocityHyperDependencyClassPathAppender(server, this)
-            ).loadDependencies(HyperRuntimeLibraries.SHARED)
-            logger.info("核心运行库已完成动态加载")
-        } catch (e: Exception) {
-            throw IllegalStateException("无法加载 HyperZoneLogin 核心运行库", e)
-        }
-    }
 
 
     private fun loadDatabaseConfig() {

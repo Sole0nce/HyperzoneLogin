@@ -23,6 +23,7 @@ package icu.h2l.api.dependency;
 
 import com.velocitypowered.api.proxy.ProxyServer;
 
+import java.lang.reflect.Method;
 import java.nio.file.Path;
 import java.util.Objects;
 
@@ -40,6 +41,17 @@ public final class VelocityHyperDependencyClassPathAppender implements HyperDepe
 
     @Override
     public void addJarToClasspath(Path file) {
+        ClassLoader classLoader = this.plugin.getClass().getClassLoader();
+
+        try {
+            Method addPath = classLoader.getClass().getDeclaredMethod("addPath", Path.class);
+            addPath.setAccessible(true);
+            addPath.invoke(classLoader, file);
+            return;
+        } catch (ReflectiveOperationException ignored) {
+            // fall back to the public API once the plugin is registered with Velocity
+        }
+
         this.proxy.getPluginManager().addToClasspath(this.plugin, file);
     }
 }

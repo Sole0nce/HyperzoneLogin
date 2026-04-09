@@ -43,6 +43,8 @@ public final class HyperRuntimeLibraries {
     public static final HyperDependency CONFIGURATE_CORE = dependency("org.spongepowered", "configurate-core", "4.2.0", "BsHp93iaGJrwwBVuvp9GnafMZ0Iz9D6BM8gxMe3Z9+A=");
     public static final HyperDependency GEANTYREF = dependency("io.leangen.geantyref", "geantyref", "1.3.16", "fx1ZEJLVFCtqqnz1n5TEx01X2+7wOy+CYpSfjza6xuM=");
     public static final HyperDependency KYORI_OPTION = dependency("net.kyori", "option", "1.1.0", "l7abSxff4CIXyRMa00JWTLya69BMdetoljm194/UsRw=");
+    public static final HyperDependency KOTLIN_STDLIB = dependency("org.jetbrains.kotlin", "kotlin-stdlib", "2.3.20", "CuElBKUEDrrzdwOQhINCDRpWJN0dk/NXZl+Md8hIoB4=");
+    public static final HyperDependency KOTLIN_REFLECT = dependency("org.jetbrains.kotlin", "kotlin-reflect", "2.3.20", "40b6PD/0RR9fcHoxKIf9TIVV2kjMFfqdsrqTwz+J+BM=");
     public static final HyperDependency KOTLINX_COROUTINES_CORE_JVM = dependency("org.jetbrains.kotlinx", "kotlinx-coroutines-core-jvm", "1.10.1", "BpxZiGMyMOB07A05Mh7DzapFR8SekLqTbGPY/JHIwA0=");
     public static final HyperDependency H2 = dependency("com.h2database", "h2", "2.1.214", "1iPNwPYdIYz1SajQnxw5H/kQlhFrIuJHVHX85PvnK9A=");
 
@@ -63,6 +65,8 @@ public final class HyperRuntimeLibraries {
         CONFIGURATE_CORE,
         GEANTYREF,
         KYORI_OPTION,
+        KOTLIN_STDLIB,
+        KOTLIN_REFLECT,
         KOTLINX_COROUTINES_CORE_JVM
     );
     public static final List<HyperDependency> DATA_MERGE_PRIVATE = List.of(H2);
