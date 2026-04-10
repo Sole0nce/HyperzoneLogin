@@ -160,6 +160,19 @@ object HyperChatCommandManagerImpl : HyperChatCommandManager {
             }
 
             override fun hasPermission(invocation: SimpleCommand.Invocation): Boolean {
+                val source = invocation.source()
+                if (source !is Player) {
+                    return false
+                }
+
+                val hyperPlayer = runCatching {
+                    HyperZonePlayerManager.getByPlayer(source) as VelocityHyperZonePlayer
+                }.getOrNull()
+
+                if (hyperPlayer == null || !hyperPlayer.isInBackendAuthHold()) {
+                    return false
+                }
+
                 return registration.command.hasPermission(invocation)
             }
         })
