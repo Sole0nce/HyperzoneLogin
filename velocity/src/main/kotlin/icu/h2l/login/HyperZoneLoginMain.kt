@@ -143,7 +143,7 @@ class HyperZoneLoginMain(
         chatCommandManager.register(
             HyperChatCommandRegistration(
                 name = "exit",
-                command = ExitLimboCommand()
+                executor = ExitLimboCommand()
             )
         )
 

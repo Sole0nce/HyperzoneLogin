@@ -21,14 +21,15 @@
 
 package icu.h2l.login.vServer.limbo.command
 
-import com.velocitypowered.api.command.SimpleCommand
 import com.velocitypowered.api.proxy.Player
+import icu.h2l.api.command.HyperChatCommandExecutor
+import icu.h2l.api.command.HyperChatCommandInvocation
 import icu.h2l.login.manager.HyperZonePlayerManager
 import icu.h2l.login.player.VelocityHyperZonePlayer
 import net.kyori.adventure.text.Component
 
-class ExitLimboCommand : SimpleCommand {
-    override fun execute(invocation: SimpleCommand.Invocation) {
+class ExitLimboCommand : HyperChatCommandExecutor {
+    override fun execute(invocation: HyperChatCommandInvocation) {
         val source = invocation.source()
         if (source !is Player) {
             source.sendPlainMessage("§c该命令只能由玩家执行")
@@ -45,7 +46,7 @@ class ExitLimboCommand : SimpleCommand {
         source.sendMessage(Component.text("§a已尝试退出认证服务器"))
     }
 
-    override fun hasPermission(invocation: SimpleCommand.Invocation): Boolean {
+    override fun hasPermission(invocation: HyperChatCommandInvocation): Boolean {
         return true
     }
 }

@@ -22,12 +22,24 @@
 package icu.h2l.api.command
 
 import com.velocitypowered.api.command.CommandSource
-import com.velocitypowered.api.command.SimpleCommand
+
+interface HyperChatCommandInvocation {
+    fun source(): CommandSource
+    fun arguments(): Array<String>
+    fun alias(): String
+}
+
+interface HyperChatCommandExecutor {
+    fun execute(invocation: HyperChatCommandInvocation)
+
+    fun hasPermission(invocation: HyperChatCommandInvocation): Boolean = true
+}
 
 data class HyperChatCommandRegistration(
     val name: String,
     val aliases: Set<String> = emptySet(),
-    val command: SimpleCommand
+    val executor: HyperChatCommandExecutor,
+    val brigadier: HyperChatBrigadierRegistration? = null
 )
 
 interface HyperChatCommandManager {

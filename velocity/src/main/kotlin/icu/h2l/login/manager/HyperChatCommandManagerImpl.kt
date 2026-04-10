@@ -21,12 +21,14 @@
 
 package icu.h2l.login.manager
 
-import com.mojang.brigadier.arguments.StringArgumentType
+import com.mojang.brigadier.Command
+import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import com.velocitypowered.api.command.BrigadierCommand
 import com.velocitypowered.api.command.CommandSource
-import com.velocitypowered.api.command.SimpleCommand
 import com.velocitypowered.api.proxy.Player
 import com.velocitypowered.api.proxy.ProxyServer
+import icu.h2l.api.command.HyperChatBrigadierContext
+import icu.h2l.api.command.HyperChatCommandInvocation
 import icu.h2l.api.command.HyperChatCommandManager
 import icu.h2l.api.command.HyperChatCommandRegistration
 import icu.h2l.api.vServer.HyperZoneVServerAdapter
@@ -102,12 +104,12 @@ object HyperChatCommandManagerImpl : HyperChatCommandManager {
             return false
         }
         val invocation = ChatInvocation(source, label, args)
-        if (!registration.command.hasPermission(invocation)) {
+        if (!registration.executor.hasPermission(invocation)) {
             source.sendMessage(Component.text("§c没有权限"))
             return true
         }
 
-        registration.command.execute(invocation)
+        registration.executor.execute(invocation)
         return true
     }
 
@@ -124,7 +126,7 @@ object HyperChatCommandManagerImpl : HyperChatCommandManager {
             metaBuilder.aliases(*registration.aliases.toTypedArray())
         }
 
-        authServer.registerCommand(metaBuilder.build(), registration.command)
+        authServer.registerCommand(metaBuilder.build(), registration)
     }
 
     private fun registerToProxyFallback(registration: HyperChatCommandRegistration) {
@@ -136,25 +138,14 @@ object HyperChatCommandManagerImpl : HyperChatCommandManager {
             return
         }
 
-        val brigadierCommand = BrigadierCommand(
-            BrigadierCommand.literalArgumentBuilder(registration.name)
-                .requires { source -> canUseProxyFallbackCommand(registration, source) }
-                .executes { context ->
-                    executeProxyFallback(registration, context.source, registration.name, emptyArray())
-                }
-                .then(
-                    BrigadierCommand.requiredArgumentBuilder("arguments", StringArgumentType.greedyString())
-                        .executes { context ->
-                            val rawArguments = StringArgumentType.getString(context, "arguments")
-                            executeProxyFallback(
-                                registration,
-                                context.source,
-                                registration.name,
-                                splitArguments(rawArguments)
-                            )
-                        }
-                )
+        val brigadierContext = HyperChatBrigadierContext(
+            registration = registration,
+            visibility = { source -> canUseProxyFallbackCommand(registration, source) },
+            executor = { source, alias, args -> executeProxyFallback(registration, source, alias, args) }
         )
+        val rootBuilder = registration.brigadier?.create(brigadierContext)
+            ?: createDefaultProxyFallbackCommand(brigadierContext)
+        val brigadierCommand = BrigadierCommand(rootBuilder)
 
         val metaBuilder = proxy.commandManager.metaBuilder(brigadierCommand)
         if (registration.aliases.isNotEmpty()) {
@@ -177,7 +168,17 @@ object HyperChatCommandManagerImpl : HyperChatCommandManager {
             return false
         }
 
-        return registration.command.hasPermission(ChatInvocation(source, registration.name, emptyArray()))
+        return registration.executor.hasPermission(ChatInvocation(source, registration.name, emptyArray()))
+    }
+
+    private fun createDefaultProxyFallbackCommand(
+        context: HyperChatBrigadierContext
+    ): LiteralArgumentBuilder<CommandSource> {
+        return context.literal()
+            .executes { commandContext ->
+                context.execute(commandContext.source)
+            }
+            .then(context.greedyArguments())
     }
 
     private fun executeProxyFallback(
@@ -188,23 +189,23 @@ object HyperChatCommandManagerImpl : HyperChatCommandManager {
     ): Int {
         if (source !is Player) {
             source.sendMessage(Component.text("§c该命令只能由玩家执行"))
-            return com.mojang.brigadier.Command.SINGLE_SUCCESS
+            return Command.SINGLE_SUCCESS
         }
 
         val hyperPlayer = getVelocityPlayer(source)
         if (hyperPlayer == null || !hyperPlayer.isInBackendAuthHold()) {
             source.sendMessage(Component.text("§e该命令仅可在认证等待阶段使用"))
-            return com.mojang.brigadier.Command.SINGLE_SUCCESS
+            return Command.SINGLE_SUCCESS
         }
 
         val invocation = ChatInvocation(source, alias, args)
-        if (!registration.command.hasPermission(invocation)) {
+        if (!registration.executor.hasPermission(invocation)) {
             source.sendMessage(Component.text("§c没有权限"))
-            return com.mojang.brigadier.Command.SINGLE_SUCCESS
+            return Command.SINGLE_SUCCESS
         }
 
-        registration.command.execute(invocation)
-        return com.mojang.brigadier.Command.SINGLE_SUCCESS
+        registration.executor.execute(invocation)
+        return Command.SINGLE_SUCCESS
     }
 
     private fun getVelocityPlayer(player: Player): VelocityHyperZonePlayer? {
@@ -213,18 +214,11 @@ object HyperChatCommandManagerImpl : HyperChatCommandManager {
         }.getOrNull()
     }
 
-    private fun splitArguments(rawArguments: String): Array<String> {
-        return rawArguments.trim()
-            .split(Regex("\\s+"))
-            .filter { it.isNotEmpty() }
-            .toTypedArray()
-    }
-
-    private data class ChatInvocation(
+    private class ChatInvocation(
         private val source: CommandSource,
         private val alias: String,
         private val args: Array<String>
-    ) : SimpleCommand.Invocation {
+    ) : HyperChatCommandInvocation {
         override fun source(): CommandSource = source
         override fun arguments(): Array<String> = args
         override fun alias(): String = alias

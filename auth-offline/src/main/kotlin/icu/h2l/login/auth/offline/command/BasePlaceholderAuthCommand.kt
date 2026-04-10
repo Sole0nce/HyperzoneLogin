@@ -21,12 +21,13 @@
 
 package icu.h2l.login.auth.offline.command
 
-import com.velocitypowered.api.command.SimpleCommand
+import icu.h2l.api.command.HyperChatCommandExecutor
+import icu.h2l.api.command.HyperChatCommandInvocation
 
 abstract class BasePlaceholderAuthCommand(
     private val usage: String
-) : SimpleCommand {
-    override fun execute(invocation: SimpleCommand.Invocation) {
+) : HyperChatCommandExecutor {
+    override fun execute(invocation: HyperChatCommandInvocation) {
         invocation.source().sendPlainMessage("§e$usage")
         invocation.source().sendPlainMessage("§7该命令功能暂未实现")
     }

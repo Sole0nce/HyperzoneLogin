@@ -22,7 +22,7 @@
 package icu.h2l.api.vServer
 
 import com.velocitypowered.api.command.CommandMeta
-import com.velocitypowered.api.command.SimpleCommand
+import icu.h2l.api.command.HyperChatCommandRegistration
 
 /**
  * Adapter interface for Limbo functionality used by the project.
@@ -31,7 +31,7 @@ import com.velocitypowered.api.command.SimpleCommand
  * to the real Limbo implementation when available.
  */
 interface HyperZoneVServerAdapter {
-    fun registerCommand(meta: CommandMeta, command: SimpleCommand)
+    fun registerCommand(meta: CommandMeta, registration: HyperChatCommandRegistration)
 }
 
 interface HyperZoneVServerProvider {

@@ -21,14 +21,14 @@
 
 package icu.h2l.login.auth.offline.command
 
-import com.velocitypowered.api.command.SimpleCommand
 import com.velocitypowered.api.proxy.Player
+import icu.h2l.api.command.HyperChatCommandInvocation
 import icu.h2l.login.auth.offline.service.OfflineAuthService
 
 class BindCommand(
     private val authService: OfflineAuthService
 ) : BasePlaceholderAuthCommand("/bind <password> <password>") {
-    override fun execute(invocation: SimpleCommand.Invocation) {
+    override fun execute(invocation: HyperChatCommandInvocation) {
         val source = invocation.source()
         if (source !is Player) {
             source.sendPlainMessage("§c该命令只能由玩家执行")

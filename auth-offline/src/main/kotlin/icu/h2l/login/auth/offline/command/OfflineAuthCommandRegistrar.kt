@@ -34,55 +34,63 @@ object OfflineAuthCommandRegistrar {
             HyperChatCommandRegistration(
                 name = "login",
                 aliases = setOf("l"),
-                command = LoginCommand(authService)
+                executor = LoginCommand(authService),
+                brigadier = OfflineAuthBrigadierCommands.login()
             )
         )
         commandManager.register(
             HyperChatCommandRegistration(
                 name = "register",
                 aliases = setOf("reg"),
-                command = RegisterCommand(authService)
+                executor = RegisterCommand(authService),
+                brigadier = OfflineAuthBrigadierCommands.register()
             )
         )
         commandManager.register(
             HyperChatCommandRegistration(
                 name = "bind",
                 aliases = setOf("b"),
-                command = BindCommand(authService)
+                executor = BindCommand(authService),
+                brigadier = OfflineAuthBrigadierCommands.bind()
             )
         )
         commandManager.register(
             HyperChatCommandRegistration(
                 name = "changepassword",
                 aliases = setOf("cpass", "changepass"),
-                command = ChangePasswordCommand(authService)
+                executor = ChangePasswordCommand(authService),
+                brigadier = OfflineAuthBrigadierCommands.changePassword()
             )
         )
         commandManager.register(
             HyperChatCommandRegistration(
                 name = "logout",
-                command = LogoutCommand(authService)
+                executor = LogoutCommand(authService),
+                brigadier = OfflineAuthBrigadierCommands.logout()
             )
         )
         commandManager.register(
             HyperChatCommandRegistration(
                 name = "email",
                 aliases = setOf("mail"),
-                command = EmailCommand(authService)
+                executor = EmailCommand(authService),
+                brigadier = OfflineAuthBrigadierCommands.email()
             )
         )
         commandManager.register(
             HyperChatCommandRegistration(
                 name = "totp",
                 aliases = setOf("2fa"),
-                command = TotpCommand(authService)
+                executor = TotpCommand(authService),
+                brigadier = OfflineAuthBrigadierCommands.totp()
             )
         )
         commandManager.register(
             HyperChatCommandRegistration(
                 name = "unregister",
                 aliases = setOf("delaccount"),
-                command = UnregisterCommand(authService)
+                executor = UnregisterCommand(authService),
+                brigadier = OfflineAuthBrigadierCommands.unregister()
             )
         )
     }

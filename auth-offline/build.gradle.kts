@@ -33,6 +33,7 @@ dependencies {
     compileOnly(project(":api"))
 //    VC
     compileOnly(libs.velocityApi)
+    compileOnly(libs.brigadier)
     // Exposed ORM
     compileOnly(libs.exposedCore)
 //    config

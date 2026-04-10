@@ -27,6 +27,8 @@ import com.velocitypowered.api.event.Subscribe
 import com.velocitypowered.api.plugin.PluginContainer
 import com.velocitypowered.api.proxy.Player
 import com.velocitypowered.api.proxy.ProxyServer
+import icu.h2l.api.command.HyperChatCommandInvocation
+import icu.h2l.api.command.HyperChatCommandRegistration
 import icu.h2l.api.event.vServer.VServerAuthStartEvent
 import icu.h2l.api.vServer.HyperZoneVServerAdapter
 import icu.h2l.login.vServer.limbo.handler.LimboAuthSessionHandler
@@ -87,8 +89,38 @@ class LimboVServerAuth(private val server: ProxyServer) : HyperZoneVServerAdapte
     }
 
     // HyperZoneLimboAdapter implementation --------------------------------------------------
-    override fun registerCommand(meta: CommandMeta, command: SimpleCommand) {
-        limboAuthServer.registerCommand(meta, command)
+    override fun registerCommand(meta: CommandMeta, registration: HyperChatCommandRegistration) {
+        limboAuthServer.registerCommand(meta, object : SimpleCommand {
+            override fun execute(invocation: SimpleCommand.Invocation) {
+                registration.executor.execute(
+                    LimboInvocation(
+                        invocation.source(),
+                        invocation.alias(),
+                        invocation.arguments()
+                    )
+                )
+            }
+
+            override fun hasPermission(invocation: SimpleCommand.Invocation): Boolean {
+                return registration.executor.hasPermission(
+                    LimboInvocation(
+                        invocation.source(),
+                        invocation.alias(),
+                        invocation.arguments()
+                    )
+                )
+            }
+        })
+    }
+
+    private class LimboInvocation(
+        private val source: com.velocitypowered.api.command.CommandSource,
+        private val alias: String,
+        private val arguments: Array<String>
+    ) : HyperChatCommandInvocation {
+        override fun source() = source
+        override fun arguments(): Array<String> = arguments
+        override fun alias(): String = alias
     }
 }
 
