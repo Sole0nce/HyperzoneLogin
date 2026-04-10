@@ -61,7 +61,14 @@ object OfflineAuthCommandRegistrar {
         commandManager.register(
             HyperChatCommandRegistration(
                 name = "logout",
-                command = LogoutCommand()
+                command = LogoutCommand(authService)
+            )
+        )
+        commandManager.register(
+            HyperChatCommandRegistration(
+                name = "email",
+                aliases = setOf("mail"),
+                command = EmailCommand(authService)
             )
         )
         commandManager.register(

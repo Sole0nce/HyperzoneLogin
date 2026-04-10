@@ -23,16 +23,23 @@ package icu.h2l.login.auth.offline.service
 
 import com.velocitypowered.api.proxy.Player
 import icu.h2l.api.player.HyperZonePlayerAccessor
+import icu.h2l.login.auth.offline.OfflineAuthMessages
+import icu.h2l.login.auth.offline.config.OfflineAuthConfigLoader
 import icu.h2l.login.auth.offline.api.db.OfflineAuthEntry
 import icu.h2l.login.auth.offline.db.OfflineAuthRepository
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
+import java.security.SecureRandom
+import java.util.Locale
 
 class OfflineAuthService(
     private val repository: OfflineAuthRepository,
     private val playerAccessor: HyperZonePlayerAccessor
 ) {
     data class Result(val success: Boolean, val message: String)
+
+    private val logger = java.util.logging.Logger.getLogger("hzl-auth-offline")
+    private val secureRandom = SecureRandom()
 
     fun register(player: Player, password: String): Result {
         val hyperZonePlayer = playerAccessor.getByPlayer(player)
@@ -43,7 +50,11 @@ class OfflineAuthService(
         }
 
         if (repository.getByName(normalizedName) != null) {
-            return Result(false, "§c你已经注册过，无法重复注册")
+            return Result(false, OfflineAuthMessages.REGISTER_REPEAT)
+        }
+
+        validatePassword(username, password)?.let {
+            return it
         }
 
         val profile = hyperZonePlayer.register()
@@ -56,9 +67,9 @@ class OfflineAuthService(
         )
         return if (created) {
             hyperZonePlayer.overVerify()
-            Result(true, "§a注册成功，已自动登录")
+            Result(true, OfflineAuthMessages.REGISTER_SUCCESS)
         } else {
-            Result(false, "§c注册失败，请稍后再试")
+            Result(false, OfflineAuthMessages.REGISTER_FAILED)
         }
     }
 
@@ -67,12 +78,16 @@ class OfflineAuthService(
         val username = hyperZonePlayer.userName
         val normalizedName = username.lowercase()
         if (!hyperZonePlayer.canBind()) {
-            return Result(false, "§c尚未完成验证，无法绑定")
+            return Result(false, OfflineAuthMessages.DENIED_COMMAND)
         }
 
         val profile = hyperZonePlayer.getDBProfile() ?: return Result(false, "§c未找到档案，无法绑定")
         if (repository.getByProfileId(profile.id) != null || repository.getByName(normalizedName) != null) {
             return Result(false, "§c已绑定，无需重复绑定")
+        }
+
+        validatePassword(username, password)?.let {
+            return it
         }
 
         val created = repository.create(
@@ -89,22 +104,48 @@ class OfflineAuthService(
     }
 
     fun login(player: Player, password: String): Result {
-        val username = playerAccessor.getByPlayer(player).userName
-        val entry = repository.getByName(username.lowercase()) ?: return Result(false, "§c尚未注册")
-        if (!verifyPassword(password, entry)) {
-            return Result(false, "§c密码错误")
+        val hyperPlayer = playerAccessor.getByPlayer(player)
+        if (hyperPlayer.isVerified()) {
+            return Result(false, OfflineAuthMessages.ALREADY_LOGGED_IN)
         }
 
-        val hyperZonePlayer = playerAccessor.getByPlayer(player)
-        hyperZonePlayer.overVerify()
-        return Result(true, "§a登录成功，已通过验证")
+        val username = hyperPlayer.userName
+        val entry = repository.getByName(username.lowercase()) ?: return Result(false, "§c尚未注册")
+
+        val now = System.currentTimeMillis()
+        val blockedUntil = entry.loginBlockedUntil
+        if (blockedUntil != null && blockedUntil > now) {
+            return Result(false, OfflineAuthMessages.loginBlocked(((blockedUntil - now) / 1000).coerceAtLeast(1)))
+        }
+
+        if (!verifyPassword(password, entry)) {
+            val protection = OfflineAuthConfigLoader.getConfig().login
+            val nextFailCount = entry.loginFailCount + 1
+            if (nextFailCount >= protection.maxAttempts) {
+                val blockedTo = now + protection.blockSeconds * 1000L
+                repository.updateLoginProtection(entry.profileId, 0, blockedTo)
+                return Result(false, OfflineAuthMessages.loginBlocked(protection.blockSeconds.toLong()))
+            }
+
+            repository.updateLoginProtection(entry.profileId, nextFailCount, null)
+            val remainingAttempts = (protection.maxAttempts - nextFailCount).coerceAtLeast(0)
+            return Result(false, OfflineAuthMessages.wrongPasswordWithRemainingAttempts(remainingAttempts))
+        }
+
+        repository.resetLoginProtection(entry.profileId)
+        hyperPlayer.overVerify()
+        return Result(true, OfflineAuthMessages.LOGIN_SUCCESS)
     }
 
     fun changePassword(player: Player, oldPassword: String, newPassword: String): Result {
         val username = playerAccessor.getByPlayer(player).userName
         val entry = repository.getByName(username.lowercase()) ?: return Result(false, "§c尚未注册")
         if (!verifyPassword(oldPassword, entry)) {
-            return Result(false, "§c旧密码错误")
+            return Result(false, OfflineAuthMessages.OLD_PASSWORD_WRONG)
+        }
+
+        validatePassword(username, newPassword)?.let {
+            return it
         }
 
         val updated = repository.updatePassword(
@@ -113,25 +154,210 @@ class OfflineAuthService(
             hashFormat = HASH_FORMAT_SHA256
         )
         return if (updated) {
-            Result(true, "§a密码已更新")
+            Result(true, OfflineAuthMessages.PASSWORD_CHANGED)
         } else {
             Result(false, "§c密码更新失败，请稍后再试")
         }
+    }
+
+    fun logout(player: Player): Result {
+        val hyperPlayer = playerAccessor.getByPlayer(player)
+        if (!hyperPlayer.isVerified()) {
+            return Result(false, OfflineAuthMessages.NOT_LOGGED_IN)
+        }
+
+        hyperPlayer.resetVerify()
+        return Result(true, OfflineAuthMessages.LOGOUT_SUCCESS)
     }
 
     fun unregister(player: Player, password: String): Result {
         val username = playerAccessor.getByPlayer(player).userName
         val entry = repository.getByName(username.lowercase()) ?: return Result(false, "§c尚未注册")
         if (!verifyPassword(password, entry)) {
-            return Result(false, "§c密码错误")
+            return Result(false, OfflineAuthMessages.PASSWORD_WRONG)
         }
 
         val deleted = repository.deleteByProfileId(entry.profileId)
         return if (deleted) {
-            Result(true, "§a账号已注销")
+            Result(true, OfflineAuthMessages.UNREGISTER_SUCCESS)
         } else {
             Result(false, "§c注销失败，请稍后再试")
         }
+    }
+
+    fun addEmail(player: Player, password: String, email: String, confirmEmail: String): Result {
+        ensureEmailFeatureEnabled()?.let { return it }
+
+        if (!email.equals(confirmEmail, ignoreCase = true)) {
+            return Result(false, "§c两次输入的邮箱不一致")
+        }
+
+        val normalizedEmail = normalizeEmail(email) ?: return Result(false, OfflineAuthMessages.EMAIL_INVALID)
+        val entry = resolveEntryByPlayer(player) ?: return Result(false, OfflineAuthMessages.UNREGISTERED)
+        if (!verifyPassword(password, entry)) {
+            return Result(false, OfflineAuthMessages.PASSWORD_WRONG)
+        }
+
+        val occupied = repository.getByEmail(normalizedEmail)
+        if (occupied != null && occupied.profileId != entry.profileId) {
+            return Result(false, OfflineAuthMessages.EMAIL_ALREADY_USED)
+        }
+
+        return if (repository.updateEmail(entry.profileId, normalizedEmail)) {
+            Result(true, OfflineAuthMessages.EMAIL_ADDED)
+        } else {
+            Result(false, "§c邮箱绑定失败，请稍后再试")
+        }
+    }
+
+    fun changeEmail(player: Player, password: String, oldEmail: String, newEmail: String): Result {
+        ensureEmailFeatureEnabled()?.let { return it }
+
+        val normalizedOldEmail = normalizeEmail(oldEmail) ?: return Result(false, OfflineAuthMessages.EMAIL_INVALID)
+        val normalizedNewEmail = normalizeEmail(newEmail) ?: return Result(false, OfflineAuthMessages.EMAIL_INVALID)
+        val entry = resolveEntryByPlayer(player) ?: return Result(false, OfflineAuthMessages.UNREGISTERED)
+        if (!verifyPassword(password, entry)) {
+            return Result(false, OfflineAuthMessages.PASSWORD_WRONG)
+        }
+
+        if (!normalizedOldEmail.equals(entry.email, ignoreCase = true)) {
+            return Result(false, "§c旧邮箱不匹配")
+        }
+
+        val occupied = repository.getByEmail(normalizedNewEmail)
+        if (occupied != null && occupied.profileId != entry.profileId) {
+            return Result(false, OfflineAuthMessages.EMAIL_ALREADY_USED)
+        }
+
+        return if (repository.updateEmail(entry.profileId, normalizedNewEmail)) {
+            Result(true, OfflineAuthMessages.EMAIL_CHANGED)
+        } else {
+            Result(false, "§c邮箱修改失败，请稍后再试")
+        }
+    }
+
+    fun showEmail(player: Player, password: String): Result {
+        ensureEmailFeatureEnabled()?.let { return it }
+
+        val entry = resolveEntryByPlayer(player) ?: return Result(false, OfflineAuthMessages.UNREGISTERED)
+        if (!verifyPassword(password, entry)) {
+            return Result(false, OfflineAuthMessages.PASSWORD_WRONG)
+        }
+
+        return if (entry.email.isNullOrBlank()) {
+            Result(false, OfflineAuthMessages.EMAIL_NOT_SET)
+        } else {
+            Result(true, OfflineAuthMessages.emailShow(entry.email))
+        }
+    }
+
+    fun startEmailRecovery(player: Player, email: String): Result {
+        ensureEmailFeatureEnabled()?.let { return it }
+
+        val normalizedEmail = normalizeEmail(email) ?: return Result(false, OfflineAuthMessages.EMAIL_INVALID)
+        val entry = repository.getByEmail(normalizedEmail) ?: return Result(false, OfflineAuthMessages.EMAIL_NOT_SET)
+        val now = System.currentTimeMillis()
+        val emailConfig = OfflineAuthConfigLoader.getConfig().email
+        val cooldownMillis = emailConfig.recoveryCooldownSeconds * 1000L
+
+        if (entry.recoveryRequestedAt != null && now - entry.recoveryRequestedAt < cooldownMillis) {
+            val remaining = ((cooldownMillis - (now - entry.recoveryRequestedAt)) / 1000).coerceAtLeast(1)
+            return Result(false, OfflineAuthMessages.recoveryCooldown(remaining))
+        }
+
+        val code = generateRecoveryCode(emailConfig.recoveryCodeLength)
+        val expireAt = now + emailConfig.recoveryCodeExpireMinutes * 60_000L
+        if (!repository.startRecovery(entry.profileId, hashPassword(code), expireAt, now)) {
+            return Result(false, "§c写入恢复码失败，请稍后再试")
+        }
+
+        deliverRecoveryCode(player.username, normalizedEmail, code, expireAt)
+        return Result(true, OfflineAuthMessages.RECOVERY_EMAIL_SENT)
+    }
+
+    fun verifyRecoveryCode(player: Player, code: String): Result {
+        ensureEmailFeatureEnabled()?.let { return it }
+
+        val entry = resolveEntryByPlayer(player) ?: return Result(false, OfflineAuthMessages.UNREGISTERED)
+        val storedHash = entry.recoveryCodeHash ?: return Result(false, OfflineAuthMessages.RECOVERY_CODE_NOT_REQUESTED)
+        val now = System.currentTimeMillis()
+
+        if (entry.recoveryCodeExpireAt == null || entry.recoveryCodeExpireAt < now) {
+            repository.clearRecoveryState(entry.profileId)
+            return Result(false, OfflineAuthMessages.RECOVERY_CODE_EXPIRED)
+        }
+
+        val emailConfig = OfflineAuthConfigLoader.getConfig().email
+        if (entry.recoveryVerifyTries >= emailConfig.maxCodeVerifyAttempts) {
+            repository.clearRecoveryState(entry.profileId)
+            return Result(false, OfflineAuthMessages.recoveryCodeAttemptsExceeded())
+        }
+
+        if (hashPassword(code) != storedHash) {
+            repository.incrementRecoveryVerifyTries(entry.profileId)
+            return Result(false, OfflineAuthMessages.RECOVERY_CODE_INCORRECT)
+        }
+
+        val verifiedUntil = now + emailConfig.resetPasswordWindowMinutes * 60_000L
+        return if (repository.markRecoveryVerified(entry.profileId, verifiedUntil)) {
+            Result(true, OfflineAuthMessages.RECOVERY_CODE_CORRECT)
+        } else {
+            Result(false, "§c恢复码状态更新失败，请稍后再试")
+        }
+    }
+
+    fun setPasswordByRecovery(player: Player, newPassword: String): Result {
+        ensureEmailFeatureEnabled()?.let { return it }
+
+        val hyperPlayer = playerAccessor.getByPlayer(player)
+        val username = hyperPlayer.userName
+        val entry = repository.getByName(username.lowercase()) ?: return Result(false, OfflineAuthMessages.UNREGISTERED)
+        val verifiedUntil = entry.resetPasswordVerifiedUntil
+        val now = System.currentTimeMillis()
+        if (verifiedUntil == null || verifiedUntil < now) {
+            repository.clearRecoveryState(entry.profileId)
+            return Result(false, OfflineAuthMessages.RECOVERY_PASSWORD_WINDOW_EXPIRED)
+        }
+
+        validatePassword(username, newPassword)?.let {
+            return it
+        }
+
+        val updated = repository.updatePassword(entry.profileId, hashPassword(newPassword), HASH_FORMAT_SHA256)
+        if (!updated) {
+            return Result(false, "§c密码重置失败，请稍后再试")
+        }
+
+        hyperPlayer.overVerify()
+        return Result(true, "${OfflineAuthMessages.PASSWORD_CHANGED} §7已自动通过本次认证")
+    }
+
+    fun getJoinPrompts(player: Player): List<String> {
+        val hyperPlayer = playerAccessor.getByPlayer(player)
+        val entry = repository.getByName(hyperPlayer.userName.lowercase())
+        val prompts = ArrayList<String>()
+
+        if (entry == null) {
+            prompts += OfflineAuthMessages.REGISTER_REQUEST
+            if (!hyperPlayer.canRegister()) {
+                prompts += "§8[§6玩家系统§8] §e检测到你已有档案，可使用 /bind <密码> <再次输入密码> 绑定离线密码"
+            }
+            return prompts
+        }
+
+        prompts += OfflineAuthMessages.LOGIN_REQUEST
+        prompts += "§8[§6玩家系统§8] §7如需修改密码：/changepassword <旧密码> <新密码>"
+        if (OfflineAuthConfigLoader.getConfig().prompt.showRecoveryHint && !entry.email.isNullOrBlank()) {
+            prompts += OfflineAuthMessages.RECOVERY_HINT
+        }
+        if (OfflineAuthConfigLoader.getConfig().email.enabled) {
+            prompts += if (entry.email.isNullOrBlank()) {
+                "§8[§6玩家系统§8] §7可使用 /email add <当前密码> <邮箱> <再次输入邮箱> 绑定邮箱"
+            } else {
+                OfflineAuthMessages.emailShow(entry.email)
+            }
+        }
+        return prompts
     }
 
     private fun verifyPassword(password: String, entry: OfflineAuthEntry): Boolean {
@@ -166,9 +392,59 @@ class OfflineAuthService(
         return bytes.joinToString("") { byte -> "%02x".format(byte) }
     }
 
+    private fun validatePassword(username: String, password: String): Result? {
+        val policy = OfflineAuthConfigLoader.getConfig().password
+        if (password.length !in policy.minLength..policy.maxLength) {
+            return Result(false, OfflineAuthMessages.unsafePassword(policy.minLength, policy.maxLength))
+        }
+
+        if (policy.denyNameInPassword && password.lowercase(Locale.ROOT).contains(username.lowercase(Locale.ROOT))) {
+            return Result(false, OfflineAuthMessages.passwordContainsName(username))
+        }
+
+        return null
+    }
+
+    private fun resolveEntryByPlayer(player: Player): OfflineAuthEntry? {
+        val username = playerAccessor.getByPlayer(player).userName
+        return repository.getByName(username.lowercase())
+    }
+
+    private fun normalizeEmail(email: String): String? {
+        val candidate = email.trim().lowercase(Locale.ROOT)
+        if (!EMAIL_PATTERN.matches(candidate)) {
+            return null
+        }
+        return candidate
+    }
+
+    private fun ensureEmailFeatureEnabled(): Result? {
+        if (!OfflineAuthConfigLoader.getConfig().email.enabled) {
+            return Result(false, OfflineAuthMessages.EMAIL_DISABLED)
+        }
+        return null
+    }
+
+    private fun generateRecoveryCode(length: Int): String {
+        val resolvedLength = length.coerceAtLeast(4)
+        return buildString(resolvedLength) {
+            repeat(resolvedLength) {
+                append(RECOVERY_CODE_CHARS[secureRandom.nextInt(RECOVERY_CODE_CHARS.length)])
+            }
+        }
+    }
+
+    private fun deliverRecoveryCode(playerName: String, email: String, code: String, expireAt: Long) {
+        val deliveryMode = OfflineAuthConfigLoader.getConfig().email.deliveryMode.uppercase(Locale.ROOT)
+        val expireMinutes = ((expireAt - System.currentTimeMillis()) / 60_000L).coerceAtLeast(1)
+        logger.warning("[$deliveryMode] 离线找回验证码 player=$playerName email=$email code=$code expireIn=${expireMinutes}m")
+    }
+
     companion object {
         private const val HASH_FORMAT_PLAIN = "plain"
         private const val HASH_FORMAT_SHA256 = "sha256"
         private const val HASH_FORMAT_AUTHME = "authme"
+        private val EMAIL_PATTERN = Regex("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")
+        private const val RECOVERY_CODE_CHARS = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
     }
 }

@@ -80,6 +80,13 @@ interface HyperZonePlayer {
     fun overVerify()
 
     /**
+     * 将玩家重新置为未验证状态。
+     *
+     * 主要用于主动登出、敏感操作后重新鉴权等场景。
+     */
+    fun resetVerify()
+
+    /**
      * 发送消息给玩家。
      */
     fun sendMessage(message: Component)

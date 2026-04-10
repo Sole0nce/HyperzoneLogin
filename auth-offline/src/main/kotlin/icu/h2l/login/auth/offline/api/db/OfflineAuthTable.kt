@@ -30,15 +30,37 @@ data class OfflineAuthEntry(
     val name: String,
     val passwordHash: String,
     val hashFormat: String,
-    val profileId: UUID
+    val profileId: UUID,
+    val email: String?,
+    val recoveryCodeHash: String?,
+    val recoveryCodeExpireAt: Long?,
+    val recoveryRequestedAt: Long?,
+    val recoveryVerifyTries: Int,
+    val resetPasswordVerifiedUntil: Long?,
+    val loginFailCount: Int,
+    val loginBlockedUntil: Long?
 )
 
 class OfflineAuthTable(prefix: String, profileTable: ProfileTable) : Table("${prefix}offline_auth") {
     val id = integer("id").autoIncrement()
-    val name = varchar("name", 32).uniqueIndex()
+    val name = varchar("name", 32)
     val passwordHash = varchar("password_hash", 255)
     val hashFormat = varchar("hash_format", 32)
-    val profileId = uuid("profile_id").references(profileTable.id).uniqueIndex()
+    val profileId = uuid("profile_id").references(profileTable.id)
+    val email = varchar("email", 255).nullable()
+    val recoveryCodeHash = varchar("recovery_code_hash", 255).nullable()
+    val recoveryCodeExpireAt = long("recovery_code_expire_at").nullable()
+    val recoveryRequestedAt = long("recovery_requested_at").nullable()
+    val recoveryVerifyTries = integer("recovery_verify_tries").default(0)
+    val resetPasswordVerifiedUntil = long("reset_password_verified_until").nullable()
+    val loginFailCount = integer("login_fail_count").default(0)
+    val loginBlockedUntil = long("login_blocked_until").nullable()
+
+    init {
+        uniqueIndex("${tableName}_name", name)
+        uniqueIndex("${tableName}_profile_id", profileId)
+        uniqueIndex("${tableName}_email", email)
+    }
 
     override val primaryKey = PrimaryKey(id)
 }

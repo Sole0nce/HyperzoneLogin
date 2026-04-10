@@ -72,7 +72,18 @@ object HyperChatCommandManagerImpl : HyperChatCommandManager {
 
     override fun executeChat(source: CommandSource, chat: String): Boolean {
         val input = chat.trim()
-        if (!input.startsWith("/")) return false
+        val hyperPlayer = (source as? Player)?.let { player ->
+            runCatching {
+                HyperZonePlayerManager.getByPlayer(player) as? VelocityHyperZonePlayer
+            }.getOrNull()
+        }
+        if (!input.startsWith("/")) {
+            if (hyperPlayer != null && !hyperPlayer.isVerified()) {
+                source.sendMessage(Component.text("§c您需要先通过验证才能聊天！"))
+                return true
+            }
+            return false
+        }
 
         val body = input.substring(1).trim()
         if (body.isEmpty()) return false
@@ -81,7 +92,13 @@ object HyperChatCommandManagerImpl : HyperChatCommandManager {
         val label = parts.first().lowercase()
         val args = if (parts.size > 1) parts.drop(1).toTypedArray() else emptyArray()
 
-        val registration = commands[label] ?: return false
+        val registration = commands[label] ?: run {
+            if (hyperPlayer != null && !hyperPlayer.isVerified()) {
+                source.sendMessage(Component.text("§e认证阶段仅可使用 /login、/register、/bind、/changepassword、/email 等认证命令"))
+                return true
+            }
+            return false
+        }
         val invocation = ChatInvocation(source, label, args)
         if (!registration.command.hasPermission(invocation)) {
             source.sendMessage(Component.text("§c没有权限"))

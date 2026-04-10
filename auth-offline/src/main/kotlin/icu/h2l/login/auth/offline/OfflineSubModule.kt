@@ -27,6 +27,7 @@ import icu.h2l.api.db.table.ProfileTable
 import icu.h2l.api.log.info
 import icu.h2l.api.module.HyperSubModule
 import icu.h2l.login.auth.offline.command.OfflineAuthCommandRegistrar
+import icu.h2l.login.auth.offline.config.OfflineAuthConfigLoader
 import icu.h2l.login.auth.offline.db.OfflineAuthRepository
 import icu.h2l.login.auth.offline.db.OfflineAuthTableManager
 import icu.h2l.login.auth.offline.service.OfflineAuthService
@@ -45,6 +46,7 @@ class OfflineSubModule : HyperSubModule {
         val profileTable = ProfileTable(databaseManager.tablePrefix)
         // Load offline matching configuration for this module
         OfflineMatchConfigLoader.load(dataDirectory)
+        OfflineAuthConfigLoader.load(dataDirectory)
         offlineAuthTableManager = OfflineAuthTableManager(
             databaseManager = databaseManager,
             tablePrefix = databaseManager.tablePrefix,
@@ -68,7 +70,7 @@ class OfflineSubModule : HyperSubModule {
             commandManager = api.chatCommandManager,
             authService = offlineAuthService
         )
-        proxy.eventManager.register(api, OfflineLimboEventListener())
+        proxy.eventManager.register(api, OfflineLimboEventListener(offlineAuthService))
         info { "OfflineSubModule 已加载，离线聊天命令与提示监听器已注册" }
     }
 }

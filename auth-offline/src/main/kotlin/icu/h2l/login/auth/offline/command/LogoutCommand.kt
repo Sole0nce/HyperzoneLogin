@@ -21,4 +21,22 @@
 
 package icu.h2l.login.auth.offline.command
 
-class LogoutCommand : BasePlaceholderAuthCommand("/logout")
+import com.velocitypowered.api.command.SimpleCommand
+import com.velocitypowered.api.proxy.Player
+import icu.h2l.login.auth.offline.OfflineAuthMessages
+import icu.h2l.login.auth.offline.service.OfflineAuthService
+
+class LogoutCommand(
+	private val authService: OfflineAuthService
+) : BasePlaceholderAuthCommand("/logout") {
+	override fun execute(invocation: SimpleCommand.Invocation) {
+		val source = invocation.source()
+		if (source !is Player) {
+			source.sendPlainMessage(OfflineAuthMessages.ONLY_PLAYER)
+			return
+		}
+
+		val result = authService.logout(source)
+		source.sendPlainMessage(result.message)
+	}
+}

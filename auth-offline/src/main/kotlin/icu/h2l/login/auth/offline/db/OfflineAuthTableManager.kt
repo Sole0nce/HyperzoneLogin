@@ -37,9 +37,10 @@ class OfflineAuthTableManager(
 ) {
     val offlineAuthTable = OfflineAuthTable(tablePrefix, profileTable)
 
+    @Suppress("DEPRECATION")
     fun createTable() {
         databaseManager.executeTransaction {
-            SchemaUtils.create(offlineAuthTable)
+            SchemaUtils.createMissingTablesAndColumns(offlineAuthTable)
         }
     }
 

@@ -173,6 +173,11 @@ class VelocityHyperZonePlayer(
         }
     }
 
+    override fun resetVerify() {
+        isVerifiedState.set(false)
+        authJoinAnnounced.set(false)
+    }
+
     fun exitLimbo() {
         limboPlayer?.disconnect()
     }
