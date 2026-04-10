@@ -21,6 +21,8 @@
 
 package icu.h2l.login.manager
 
+import com.mojang.brigadier.arguments.StringArgumentType
+import com.velocitypowered.api.command.BrigadierCommand
 import com.velocitypowered.api.command.CommandSource
 import com.velocitypowered.api.command.SimpleCommand
 import com.velocitypowered.api.proxy.Player
@@ -134,48 +136,88 @@ object HyperChatCommandManagerImpl : HyperChatCommandManager {
             return
         }
 
-        val metaBuilder = proxy.commandManager.metaBuilder(registration.name)
+        val brigadierCommand = BrigadierCommand(
+            BrigadierCommand.literalArgumentBuilder(registration.name)
+                .requires { source -> canUseProxyFallbackCommand(registration, source) }
+                .executes { context ->
+                    executeProxyFallback(registration, context.source, registration.name, emptyArray())
+                }
+                .then(
+                    BrigadierCommand.requiredArgumentBuilder("arguments", StringArgumentType.greedyString())
+                        .executes { context ->
+                            val rawArguments = StringArgumentType.getString(context, "arguments")
+                            executeProxyFallback(
+                                registration,
+                                context.source,
+                                registration.name,
+                                splitArguments(rawArguments)
+                            )
+                        }
+                )
+        )
+
+        val metaBuilder = proxy.commandManager.metaBuilder(brigadierCommand)
         if (registration.aliases.isNotEmpty()) {
             metaBuilder.aliases(*registration.aliases.toTypedArray())
         }
 
-        proxy.commandManager.register(metaBuilder.build(), object : SimpleCommand {
-            override fun execute(invocation: SimpleCommand.Invocation) {
-                val source = invocation.source()
-                if (source !is Player) {
-                    source.sendMessage(Component.text("§c该命令只能由玩家执行"))
-                    return
-                }
+        proxy.commandManager.register(metaBuilder.build(), brigadierCommand)
+    }
 
-                val hyperPlayer = runCatching {
-                    HyperZonePlayerManager.getByPlayer(source) as VelocityHyperZonePlayer
-                }.getOrNull()
+    private fun canUseProxyFallbackCommand(
+        registration: HyperChatCommandRegistration,
+        source: CommandSource
+    ): Boolean {
+        if (source !is Player) {
+            return false
+        }
 
-                if (hyperPlayer == null || !hyperPlayer.isInBackendAuthHold()) {
-                    source.sendMessage(Component.text("§e该命令仅可在认证等待阶段使用"))
-                    return
-                }
+        val hyperPlayer = getVelocityPlayer(source) ?: return false
+        if (!hyperPlayer.isInBackendAuthHold()) {
+            return false
+        }
 
-                registration.command.execute(invocation)
-            }
+        return registration.command.hasPermission(ChatInvocation(source, registration.name, emptyArray()))
+    }
 
-            override fun hasPermission(invocation: SimpleCommand.Invocation): Boolean {
-                val source = invocation.source()
-                if (source !is Player) {
-                    return false
-                }
+    private fun executeProxyFallback(
+        registration: HyperChatCommandRegistration,
+        source: CommandSource,
+        alias: String,
+        args: Array<String>
+    ): Int {
+        if (source !is Player) {
+            source.sendMessage(Component.text("§c该命令只能由玩家执行"))
+            return com.mojang.brigadier.Command.SINGLE_SUCCESS
+        }
 
-                val hyperPlayer = runCatching {
-                    HyperZonePlayerManager.getByPlayer(source) as VelocityHyperZonePlayer
-                }.getOrNull()
+        val hyperPlayer = getVelocityPlayer(source)
+        if (hyperPlayer == null || !hyperPlayer.isInBackendAuthHold()) {
+            source.sendMessage(Component.text("§e该命令仅可在认证等待阶段使用"))
+            return com.mojang.brigadier.Command.SINGLE_SUCCESS
+        }
 
-                if (hyperPlayer == null || !hyperPlayer.isInBackendAuthHold()) {
-                    return false
-                }
+        val invocation = ChatInvocation(source, alias, args)
+        if (!registration.command.hasPermission(invocation)) {
+            source.sendMessage(Component.text("§c没有权限"))
+            return com.mojang.brigadier.Command.SINGLE_SUCCESS
+        }
 
-                return registration.command.hasPermission(invocation)
-            }
-        })
+        registration.command.execute(invocation)
+        return com.mojang.brigadier.Command.SINGLE_SUCCESS
+    }
+
+    private fun getVelocityPlayer(player: Player): VelocityHyperZonePlayer? {
+        return runCatching {
+            HyperZonePlayerManager.getByPlayer(player) as VelocityHyperZonePlayer
+        }.getOrNull()
+    }
+
+    private fun splitArguments(rawArguments: String): Array<String> {
+        return rawArguments.trim()
+            .split(Regex("\\s+"))
+            .filter { it.isNotEmpty() }
+            .toTypedArray()
     }
 
     private data class ChatInvocation(

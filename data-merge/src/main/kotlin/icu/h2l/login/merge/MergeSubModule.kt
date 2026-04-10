@@ -48,22 +48,20 @@ class MergeSubModule : HyperSubModule {
         val mlMigrator = MlDataMigrator(dataDirectory, databaseManager, mergeMlConfig)
         val amMigrator = AmDataMigrator(dataDirectory, databaseManager, mergeAmConfig)
 
-        val mergeCommandMeta = proxy.commandManager.metaBuilder("hzl-merge").build()
-        proxy.commandManager.register(
-            mergeCommandMeta,
-            MergeCommand(
-                runMlMigration = {
-                    val report = mlMigrator.migrate()
-                    "profiles(created=${report.targetProfilesCreated}, matched=${report.targetProfilesMatched}, failed=${report.targetProfileFailures}), " +
-                        "entries(created=${report.targetEntriesCreated}, matched=${report.targetEntriesMatched}, conflicts=${report.targetEntryConflicts}, failed=${report.targetEntryFailures}, missingProfile=${report.missingProfileReference})"
-                },
-                runAmMigration = {
-                    val report = amMigrator.migrate()
-                    "profiles(created=${report.targetProfilesCreated}, matched=${report.targetProfilesMatched}, failed=${report.targetProfileFailures}), " +
-                        "offlineAuth(created=${report.targetOfflineAuthCreated}, matched=${report.targetOfflineAuthMatched}, updated=${report.targetOfflineAuthUpdated}, conflicts=${report.targetOfflineAuthConflicts}, failed=${report.targetOfflineAuthFailures}, invalidPassword=${report.invalidPasswordFormat})"
-                }
-            )
-        )
+        val mergeCommand = MergeCommand(
+            runMlMigration = {
+                val report = mlMigrator.migrate()
+                "profiles(created=${report.targetProfilesCreated}, matched=${report.targetProfilesMatched}, failed=${report.targetProfileFailures}), " +
+                    "entries(created=${report.targetEntriesCreated}, matched=${report.targetEntriesMatched}, conflicts=${report.targetEntryConflicts}, failed=${report.targetEntryFailures}, missingProfile=${report.missingProfileReference})"
+            },
+            runAmMigration = {
+                val report = amMigrator.migrate()
+                "profiles(created=${report.targetProfilesCreated}, matched=${report.targetProfilesMatched}, failed=${report.targetProfileFailures}), " +
+                    "offlineAuth(created=${report.targetOfflineAuthCreated}, matched=${report.targetOfflineAuthMatched}, updated=${report.targetOfflineAuthUpdated}, conflicts=${report.targetOfflineAuthConflicts}, failed=${report.targetOfflineAuthFailures}, invalidPassword=${report.invalidPasswordFormat})"
+            }
+        ).createCommand()
+        val mergeCommandMeta = proxy.commandManager.metaBuilder(mergeCommand).build()
+        proxy.commandManager.register(mergeCommandMeta, mergeCommand)
 
         info { "MergeSubModule 已加载，命令 /hzl-merge ml 和 /hzl-merge am 可用" }
     }

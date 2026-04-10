@@ -34,6 +34,7 @@ dependencies {
     compileOnly(project(":auth-offline"))
 
     compileOnly(libs.velocityApi)
+    compileOnly(libs.brigadier)
 
     needPackageCompileOnly(libs.h2)
 

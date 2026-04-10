@@ -21,49 +21,59 @@
 
 package icu.h2l.login.merge.command
 
-import com.velocitypowered.api.command.SimpleCommand
+import com.mojang.brigadier.Command
+import com.velocitypowered.api.command.BrigadierCommand
+import com.velocitypowered.api.command.CommandSource
 import java.util.concurrent.atomic.AtomicBoolean
 
 class MergeCommand(
     private val runMlMigration: () -> String,
     private val runAmMigration: () -> String
-) : SimpleCommand {
+) {
     private val running = AtomicBoolean(false)
 
-    override fun execute(invocation: SimpleCommand.Invocation) {
-        val sender = invocation.source()
-        val args = invocation.arguments()
+    fun createCommand(): BrigadierCommand {
+        return BrigadierCommand(
+            BrigadierCommand.literalArgumentBuilder("hzl-merge")
+                .requires { source -> source.hasPermission(ADMIN_PERMISSION) }
+                .executes { context ->
+                    showUsage(context.source)
+                    Command.SINGLE_SUCCESS
+                }
+                .then(
+                    BrigadierCommand.literalArgumentBuilder("ml")
+                        .executes { context ->
+                            executeMigration(context.source, "ml", "§e开始执行 ML 迁移，请稍候...", runMlMigration)
+                        }
+                )
+                .then(
+                    BrigadierCommand.literalArgumentBuilder("am")
+                        .executes { context ->
+                            executeMigration(context.source, "am", "§e开始执行 AUTHME 迁移，请稍候...", runAmMigration)
+                        }
+                )
+        )
+    }
 
-        if (args.isEmpty()) {
-            sender.sendPlainMessage("§e/hzl-merge ml")
-            sender.sendPlainMessage("§e/hzl-merge am")
-            return
-        }
+    private fun showUsage(sender: CommandSource) {
+        sender.sendPlainMessage("§e/hzl-merge ml")
+        sender.sendPlainMessage("§e/hzl-merge am")
+    }
 
-        val subCommand = args[0].lowercase()
-        if (subCommand != "ml" && subCommand != "am") {
-            sender.sendPlainMessage("§c未知子命令: ${args[0]}")
-            sender.sendPlainMessage("§e可用子命令: ml, am")
-            return
-        }
-
+    private fun executeMigration(
+        sender: CommandSource,
+        subCommand: String,
+        startMessage: String,
+        action: () -> String
+    ): Int {
         if (!running.compareAndSet(false, true)) {
             sender.sendPlainMessage("§c迁移正在执行中，请稍后再试")
-            return
+            return Command.SINGLE_SUCCESS
         }
 
         try {
-            val summary = when (subCommand) {
-                "ml" -> {
-                    sender.sendPlainMessage("§e开始执行 ML 迁移，请稍候...")
-                    runMlMigration()
-                }
-
-                else -> {
-                    sender.sendPlainMessage("§e开始执行 AUTHME 迁移，请稍候...")
-                    runAmMigration()
-                }
-            }
+            sender.sendPlainMessage(startMessage)
+            val summary = action()
 
             sender.sendPlainMessage("§a迁移完成: $summary")
             sender.sendPlainMessage(
@@ -74,9 +84,11 @@ class MergeCommand(
         } finally {
             running.set(false)
         }
+
+        return Command.SINGLE_SUCCESS
     }
 
-    override fun hasPermission(invocation: SimpleCommand.Invocation): Boolean {
-        return invocation.source().hasPermission("hyperzonelogin.admin")
+    companion object {
+        private const val ADMIN_PERMISSION = "hyperzonelogin.admin"
     }
 }
