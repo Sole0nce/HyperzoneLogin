@@ -240,13 +240,8 @@ class YggdrasilAuthModule(
             return null
         }
 
-        val trustedName = result.profile.name
-        val trustedUuid = result.profile.id
-        val profileId = entryDatabaseHelper.findEntryByNameAndUuid(
-            entryId = result.entryId,
-            name = trustedName,
-            uuid = trustedUuid
-        ) ?: return "认证成功，但未找到可信 Entry 绑定"
+        val profileId = findBoundProfileIdByAuthenticatedEntry(result)
+            ?: return "认证成功，但未找到可信 Entry 绑定"
 
         val attached = handler.attachProfile(profileId)
             ?: return "认证成功，但绑定 Profile 失败: $profileId"
@@ -492,11 +487,18 @@ class YggdrasilAuthModule(
      * 使用远端认证成功后返回的可信身份，确认 Entry 绑定到的 Profile。
      */
     private fun findBoundProfileIdByAuthenticatedEntry(success: YggdrasilAuthResult.Success): UUID? {
-        return entryDatabaseHelper.findEntryByNameAndUuid(
+        val profileId = entryDatabaseHelper.findEntryByUuid(
             entryId = success.entryId,
-            name = success.profile.name,
             uuid = success.profile.id
+        ) ?: return null
+
+        entryDatabaseHelper.updateEntryName(
+            entryId = success.entryId,
+            uuid = success.profile.id,
+            newName = success.profile.name
         )
+
+        return profileId
     }
 
     private fun findCandidateEntriesByClientIdentity(username: String, uuid: UUID): List<String> {
@@ -511,7 +513,7 @@ class YggdrasilAuthModule(
 
                 if (entryTable != null) {
                     // 这里只做候选 Entry 发现，属于弱匹配；真正的绑定确认必须在远端认证成功后
-                    // 使用可信返回的 name/uuid 再反查 Entry -> profileId。
+                    // 使用可信返回的 uuid 反查 Entry -> profileId，并同步最新 name。
                     val hasRecord =
                         entryTable.selectAll().where { (entryTable.name eq username) or (entryTable.uuid eq uuid) }
                             .count() > 0

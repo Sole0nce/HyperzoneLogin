@@ -23,7 +23,6 @@ package icu.h2l.login.auth.online.db
 
 import icu.h2l.api.db.HyperZoneDatabaseManager
 import icu.h2l.api.log.warn
-import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
@@ -36,13 +35,19 @@ class EntryDatabaseHelper(
     private val databaseManager: HyperZoneDatabaseManager,
     private val entryTableManager: EntryTableManager
 ) {
-    fun findEntryByNameAndUuid(entryId: String, name: String, uuid: UUID): UUID? {
+    fun findEntryByUuid(entryId: String, uuid: UUID): UUID? {
         val entryTable = entryTableManager.getEntryTable(entryId) ?: return null
 
         return databaseManager.executeTransaction {
-            entryTable.selectAll().where { (entryTable.name eq name) and (entryTable.uuid eq uuid) }
+            val matchedProfileIds = entryTable.selectAll().where { entryTable.uuid eq uuid }
                 .map { it[entryTable.pid] }
-                .firstOrNull()
+
+            val distinctProfileIds = matchedProfileIds.distinct()
+            if (distinctProfileIds.size > 1) {
+                warn { "Entry $entryId 中 UUID=$uuid 存在多个 profileId 绑定: $distinctProfileIds" }
+            }
+
+            distinctProfileIds.firstOrNull()
         }
     }
 
@@ -51,39 +56,67 @@ class EntryDatabaseHelper(
 
         return try {
             databaseManager.executeTransaction {
-                entryTable.insert {
-                    it[entryTable.name] = name
-                    it[entryTable.uuid] = uuid
-                    it[entryTable.pid] = pid
+                val existingBindings = entryTable.selectAll().where { entryTable.uuid eq uuid }
+                    .map { row -> row[entryTable.pid] to row[entryTable.name] }
+
+                when {
+                    existingBindings.isEmpty() -> {
+                        entryTable.insert {
+                            it[entryTable.name] = name
+                            it[entryTable.uuid] = uuid
+                            it[entryTable.pid] = pid
+                        }
+                    }
+
+                    existingBindings.any { (existingPid, _) -> existingPid != pid } -> {
+                        warn {
+                            "创建入口记录失败: Entry $entryId 中 UUID=$uuid 已绑定到其他 profileId=${existingBindings.map { it.first }.distinct()}，拒绝改绑到 $pid"
+                        }
+                        return@executeTransaction false
+                    }
+
+                    existingBindings.any { (_, existingName) -> existingName != name } -> {
+                        entryTable.update({ entryTable.uuid eq uuid }) {
+                            it[entryTable.name] = name
+                        }
+                    }
                 }
+
+                true
             }
-            true
         } catch (e: Exception) {
             warn { "创建入口记录失败: ${e.message}" }
             false
         }
     }
 
-    fun updateEntryName(entryId: String, oldUuid: UUID, newName: String): Boolean {
+    fun updateEntryName(entryId: String, uuid: UUID, newName: String): Boolean {
         val entryTable = entryTableManager.getEntryTable(entryId) ?: return false
 
         return try {
             databaseManager.executeTransaction {
-                entryTable.update({ entryTable.uuid eq oldUuid }) {
-                    it[name] = newName
+                val existingNames = entryTable.selectAll().where { entryTable.uuid eq uuid }
+                    .map { it[entryTable.name] }
+
+                when {
+                    existingNames.isEmpty() -> false
+                    existingNames.all { it == newName } -> true
+                    else -> entryTable.update({ entryTable.uuid eq uuid }) {
+                        it[name] = newName
+                    } > 0
                 }
-            } > 0
+            }
         } catch (e: Exception) {
             warn { "更新入口名称失败: ${e.message}" }
             false
         }
     }
 
-    fun verifyEntry(entryId: String, name: String, uuid: UUID): Boolean {
+    fun verifyEntry(entryId: String, uuid: UUID): Boolean {
         val entryTable = entryTableManager.getEntryTable(entryId) ?: return false
 
         return databaseManager.executeTransaction {
-            entryTable.selectAll().where { (entryTable.name eq name) and (entryTable.uuid eq uuid) }.count() > 0
+            entryTable.selectAll().where { entryTable.uuid eq uuid }.count() > 0
         }
     }
 }
