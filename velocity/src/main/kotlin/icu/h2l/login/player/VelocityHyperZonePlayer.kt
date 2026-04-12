@@ -27,6 +27,7 @@ import com.velocitypowered.proxy.connection.client.ConnectedPlayer
 import icu.h2l.api.db.Profile
 import icu.h2l.api.event.profile.ProfileResolveEvent
 import icu.h2l.api.log.error
+import icu.h2l.api.log.warn
 import icu.h2l.api.player.HyperZonePlayer
 import icu.h2l.api.profile.skin.ProfileSkinTextures
 import icu.h2l.api.util.RemapUtils
@@ -393,6 +394,13 @@ class VelocityHyperZonePlayer(
             return
         }
 
+        val property = textures.toPropertyOrNull() ?: run {
+            warn {
+                "[ProfileSkinFlow] $failureLabel self ADD_PLAYER skipped due to incomplete textures: player=$userName, valueLength=${textures.value.length}, signed=${textures.isSigned}"
+            }
+            return
+        }
+
         if (!forceReplay && !selfSkinAddPlayerSent.compareAndSet(false, true)) {
             return
         }
@@ -400,7 +408,7 @@ class VelocityHyperZonePlayer(
         val replayProfile = GameProfile(
             clientSendUUID,
             clientSendName,
-            listOf(textures.toProperty())
+            listOf(property)
         )
 
         connectedPlayer.connection.eventLoop().execute {

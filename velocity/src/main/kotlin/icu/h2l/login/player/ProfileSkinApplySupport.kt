@@ -25,6 +25,7 @@ import com.velocitypowered.api.util.GameProfile
 import icu.h2l.api.event.profile.ProfileSkinApplyEvent
 import icu.h2l.api.log.debug
 import icu.h2l.api.log.error
+import icu.h2l.api.log.warn
 import icu.h2l.api.player.HyperZonePlayer
 import icu.h2l.login.HyperZoneLoginMain
 
@@ -47,10 +48,16 @@ object ProfileSkinApplySupport {
         }
 
         val textures = event.textures ?: return baseProfile
+        val property = textures.toPropertyOrNull() ?: run {
+            warn {
+                "[ProfileSkinFlow] apply skipped incomplete textures: player=${hyperZonePlayer.userName}, profile=${baseProfile.id}, valueLength=${textures.value.length}, signed=${textures.isSigned}"
+            }
+            return baseProfile
+        }
         val mergedProperties = baseProfile.properties
             .filterNot { it.name.equals("textures", ignoreCase = true) }
             .toMutableList()
-            .apply { add(textures.toProperty()) }
+            .apply { add(property) }
 
         return GameProfile(
             baseProfile.id,

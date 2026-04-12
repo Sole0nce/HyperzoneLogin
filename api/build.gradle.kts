@@ -39,6 +39,7 @@ dependencies {
 // Exposed ORM
     implementation(libs.exposedCore)
 
+    testImplementation(libs.velocityApi)
     testImplementation(platform(libs.junitBom))
     testImplementation(libs.junitJupiter)
     testRuntimeOnly(libs.junitPlatformLauncher)

@@ -39,6 +39,53 @@ data class ProfileSkinCacheRecord(
     val updatedAt: Long
 )
 
+internal fun hasSourceChanged(
+    existing: ProfileSkinCacheRecord,
+    source: ProfileSkinSource?,
+    sourceHash: String?
+): Boolean {
+    val newUrl = source?.skinUrl
+    val newModel = source?.model
+
+    if (newUrl.isNullOrBlank() && sourceHash.isNullOrBlank()) {
+        return false
+    }
+
+    if (source != null && sourceHash != existing.sourceHash) {
+        return true
+    }
+
+    if (!newUrl.isNullOrBlank() && newUrl != existing.skinUrl) {
+        return true
+    }
+
+    if (!newModel.isNullOrBlank() && newModel != existing.skinModel) {
+        return true
+    }
+
+    return false
+}
+
+internal fun hasTexturesChanged(
+    existing: ProfileSkinCacheRecord,
+    textures: ProfileSkinTextures
+): Boolean {
+    return existing.textures.value != textures.value || existing.textures.signature != textures.signature
+}
+
+internal fun shouldSkipSave(
+    existing: ProfileSkinCacheRecord?,
+    source: ProfileSkinSource?,
+    textures: ProfileSkinTextures,
+    sourceHash: String?
+): Boolean {
+    if (existing == null) {
+        return false
+    }
+    return !hasSourceChanged(existing, source, sourceHash)
+            && !hasTexturesChanged(existing, textures)
+}
+
 class ProfileSkinCacheRepository(
     private val databaseManager: HyperZoneDatabaseManager,
     private val table: ProfileSkinCacheTable
@@ -93,7 +140,7 @@ class ProfileSkinCacheRepository(
 
     fun save(profileId: UUID, source: ProfileSkinSource?, textures: ProfileSkinTextures, sourceHash: String?): SaveResult {
         val existing = findByProfileId(profileId)
-        if (existing != null && !hasSourceChanged(existing, source, sourceHash)) {
+        if (shouldSkipSave(existing, source, textures, sourceHash)) {
             return SaveResult.SKIPPED
         }
 
@@ -138,33 +185,6 @@ class ProfileSkinCacheRepository(
         }
 
         return SaveResult.SKIPPED
-    }
-
-    private fun hasSourceChanged(
-        existing: ProfileSkinCacheRecord,
-        source: ProfileSkinSource?,
-        sourceHash: String?
-    ): Boolean {
-        val newUrl = source?.skinUrl
-        val newModel = source?.model
-
-        if (newUrl.isNullOrBlank() && sourceHash.isNullOrBlank()) {
-            return false
-        }
-
-        if (!sourceHash.isNullOrBlank() && sourceHash != existing.sourceHash) {
-            return true
-        }
-
-        if (!newUrl.isNullOrBlank() && newUrl != existing.skinUrl) {
-            return true
-        }
-
-        if (!newModel.isNullOrBlank() && newModel != existing.skinModel) {
-            return true
-        }
-
-        return false
     }
 }
 

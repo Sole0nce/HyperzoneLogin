@@ -29,6 +29,7 @@ import icu.h2l.api.event.profile.ProfileSkinApplyEvent
 import icu.h2l.api.event.profile.ProfileSkinPreprocessEvent
 import icu.h2l.api.log.debug
 import icu.h2l.api.log.error
+import icu.h2l.api.log.warn
 import icu.h2l.api.profile.skin.ProfileSkinModel
 import icu.h2l.api.profile.skin.ProfileSkinSource
 import icu.h2l.api.profile.skin.ProfileSkinTextures
@@ -50,6 +51,31 @@ import java.util.Base64
 import java.util.UUID
 import javax.imageio.ImageIO
 import net.kyori.adventure.text.Component
+
+internal fun shouldUseSourceCache(shouldForceRestoreSignedTextures: Boolean): Boolean {
+    return !shouldForceRestoreSignedTextures
+}
+
+internal fun sanitizeFallbackTextures(
+    textures: ProfileSkinTextures,
+    shouldForceRestoreSignedTextures: Boolean
+): ProfileSkinTextures {
+    /**
+     * 当上游 signed textures 不可信且 MineSkin 修复失败时，不能再构造“value 存在但 signature 为空”的半残属性，
+     * 因为 Velocity 的 `GameProfile.Property` 不接受空签名。
+     *
+     * 这里采用折中策略：保留最开始传入的整份 signed textures 作为 profile 级 fallback，
+     * 同时配合 `sanitizeFallbackSourceHash` 禁止把这份不可信结果继续提升为 source 级缓存。
+     */
+    return textures
+}
+
+internal fun sanitizeFallbackSourceHash(
+    sourceHash: String?,
+    shouldForceRestoreSignedTextures: Boolean
+): String? {
+    return if (shouldForceRestoreSignedTextures) null else sourceHash
+}
 
 class ProfileSkinService(
     private val config: ProfileSkinConfig,
@@ -99,6 +125,7 @@ class ProfileSkinService(
         }
 
         if (shouldAttemptRestore) {
+            if (shouldUseSourceCache(shouldForceRestoreSignedTextures)) {
             repository.findBySourceHash(sourceHash!!)?.let { cached ->
                 logSaveResult(
                     repository.save(profileId, source, cached.textures, sourceHash),
@@ -109,6 +136,7 @@ class ProfileSkinService(
                 )
                 event.textures = cached.textures
                 return
+            }
             }
 
             runCatching {
@@ -129,14 +157,21 @@ class ProfileSkinService(
         }
 
         if (upstreamTextures != null) {
+            val fallbackTextures = sanitizeFallbackTextures(upstreamTextures, shouldForceRestoreSignedTextures)
+            val fallbackSourceHash = sanitizeFallbackSourceHash(sourceHash, shouldForceRestoreSignedTextures)
+            if (shouldForceRestoreSignedTextures && fallbackTextures.isSigned) {
+                warn {
+                    "[ProfileSkinFlow] preprocess fallback uses original untrusted signed textures after restore failure: profile=$profileId, entry=${event.entryId}, source=${describeSource(source)}, sourceHashCacheDisabled=${fallbackSourceHash == null}"
+                }
+            }
             logSaveResult(
-                repository.save(profileId, source, upstreamTextures, sourceHash),
+                repository.save(profileId, source, fallbackTextures, fallbackSourceHash),
                 profileId,
                 source,
-                sourceHash,
+                fallbackSourceHash,
                 "upstream fallback"
             )
-            event.textures = upstreamTextures
+            event.textures = fallbackTextures
         } else {
             debug {
                 "[ProfileSkinFlow] preprocess finished without textures: profile=$profileId, source=${describeSource(source)}"

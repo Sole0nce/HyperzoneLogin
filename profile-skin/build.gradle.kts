@@ -25,6 +25,7 @@ plugins {
 
 dependencies {
     compileOnly(project(":api"))
+    testImplementation(project(":api"))
 
     compileOnly(libs.velocityApi)
     compileOnly(libs.velocityProxy)

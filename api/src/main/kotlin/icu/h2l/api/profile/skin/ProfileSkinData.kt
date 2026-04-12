@@ -45,8 +45,25 @@ data class ProfileSkinTextures(
     val value: String,
     val signature: String? = null
 ) {
-    fun toProperty(): GameProfile.Property {
+    /**
+     * Velocity 当前只提供“必须携带完整 signature”的 `GameProfile.Property` 构造器。
+     *
+     * 因此：
+     * 1. 有非空白签名时，才能安全构造 property；
+     * 2. 无签名或空白签名时，必须由上层决定“跳过注入”或“回退到其它完整资料”，
+     *    绝不能把空签名直接传给 Velocity。
+     */
+    fun toPropertyOrNull(): GameProfile.Property? {
+        if (signature.isNullOrBlank()) {
+            return null
+        }
         return GameProfile.Property("textures", value, signature)
+    }
+
+    fun toProperty(): GameProfile.Property {
+        return requireNotNull(toPropertyOrNull()) {
+            "ProfileSkinTextures cannot be converted to GameProfile.Property without a non-blank signature"
+        }
     }
 
     val isSigned: Boolean
