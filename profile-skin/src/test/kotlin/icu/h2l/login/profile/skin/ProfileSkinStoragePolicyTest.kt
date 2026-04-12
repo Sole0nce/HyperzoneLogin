@@ -26,6 +26,7 @@ import icu.h2l.api.profile.skin.ProfileSkinTextures
 import icu.h2l.login.profile.skin.db.ProfileSkinCacheRecord
 import icu.h2l.login.profile.skin.db.isEligibleForSourceCache
 import icu.h2l.login.profile.skin.db.shouldSkipSave
+import icu.h2l.login.profile.skin.db.shouldUseSharedCacheEntry
 import icu.h2l.login.profile.skin.service.sanitizeFallbackSourceHash
 import icu.h2l.login.profile.skin.service.sanitizeFallbackTextures
 import icu.h2l.login.profile.skin.service.shouldUseSourceCache
@@ -49,12 +50,13 @@ class ProfileSkinStoragePolicyTest {
         assertEquals(upstream, fallback)
         assertNull(sanitizeFallbackSourceHash("source-hash", shouldForceRestoreSignedTextures = true))
         assertTrue(shouldUseSourceCache(shouldForceRestoreSignedTextures = true))
+        assertFalse(shouldUseSharedCacheEntry(sourceHash = null, sourceCacheEligible = false))
     }
 
     @Test
     fun `same source but cleared source hash must still be saved`() {
         val existing = ProfileSkinCacheRecord(
-            profileId = UUID.randomUUID(),
+            skinId = UUID.randomUUID(),
             sourceHash = "source-hash",
             sourceCacheEligible = true,
             skinUrl = "https://textures.example/skin.png",
@@ -88,7 +90,7 @@ class ProfileSkinStoragePolicyTest {
     @Test
     fun `unchanged source and textures can skip save`() {
         val existing = ProfileSkinCacheRecord(
-            profileId = UUID.randomUUID(),
+            skinId = UUID.randomUUID(),
             sourceHash = "source-hash",
             sourceCacheEligible = true,
             skinUrl = "https://textures.example/skin.png",
@@ -118,7 +120,7 @@ class ProfileSkinStoragePolicyTest {
     @Test
     fun `legacy source cache rows remain eligible for lookup`() {
         val legacy = ProfileSkinCacheRecord(
-            profileId = UUID.randomUUID(),
+            skinId = UUID.randomUUID(),
             sourceHash = "source-hash",
             sourceCacheEligible = null,
             skinUrl = "https://textures.example/skin.png",
@@ -131,6 +133,13 @@ class ProfileSkinStoragePolicyTest {
         )
 
         assertTrue(isEligibleForSourceCache(legacy))
+    }
+
+    @Test
+    fun `only reusable rows with source hash should share cache entries`() {
+        assertTrue(shouldUseSharedCacheEntry(sourceHash = "source-hash", sourceCacheEligible = true))
+        assertFalse(shouldUseSharedCacheEntry(sourceHash = "source-hash", sourceCacheEligible = false))
+        assertFalse(shouldUseSharedCacheEntry(sourceHash = null, sourceCacheEligible = true))
     }
 }
 

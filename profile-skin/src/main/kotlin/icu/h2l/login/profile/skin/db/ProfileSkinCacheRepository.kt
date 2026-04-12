@@ -25,13 +25,14 @@ import icu.h2l.api.db.HyperZoneDatabaseManager
 import icu.h2l.api.log.warn
 import icu.h2l.api.profile.skin.ProfileSkinSource
 import icu.h2l.api.profile.skin.ProfileSkinTextures
+import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.update
 import java.util.UUID
 
 data class ProfileSkinCacheRecord(
-    val profileId: UUID,
+    val skinId: UUID,
     val sourceHash: String?,
     val sourceCacheEligible: Boolean?,
     val skinUrl: String?,
@@ -100,103 +101,124 @@ internal fun shouldSkipSave(
             && !hasSourceCacheEligibilityChanged(existing, sourceCacheEligible)
 }
 
+internal fun shouldUseSharedCacheEntry(sourceHash: String?, sourceCacheEligible: Boolean): Boolean {
+    return sourceCacheEligible && !sourceHash.isNullOrBlank()
+}
+
 class ProfileSkinCacheRepository(
     private val databaseManager: HyperZoneDatabaseManager,
-    private val table: ProfileSkinCacheTable
+    private val cacheTable: ProfileSkinCacheTable
 ) {
-    enum class SaveResult {
-        INSERTED,
-        UPDATED,
-        SKIPPED
+    data class SaveResult(
+        val action: Action,
+        val record: ProfileSkinCacheRecord
+    ) {
+        enum class Action {
+            INSERTED,
+            UPDATED,
+            SKIPPED
+        }
     }
 
-    fun findByProfileId(profileId: UUID): ProfileSkinCacheRecord? {
+    fun findBySkinId(skinId: UUID): ProfileSkinCacheRecord? {
         return databaseManager.executeTransaction {
-            table.selectAll().where { table.profileId eq profileId }
+            cacheTable.selectAll().where { cacheTable.id eq skinId }
                 .limit(1)
-                .map { row ->
-                    ProfileSkinCacheRecord(
-                        profileId = row[table.profileId],
-                        sourceHash = row[table.sourceHash],
-                        sourceCacheEligible = row[table.sourceCacheEligible],
-                        skinUrl = row[table.skinUrl],
-                        skinModel = row[table.skinModel],
-                        textures = ProfileSkinTextures(
-                            value = row[table.textureValue],
-                            signature = row[table.textureSignature]
-                        ),
-                        updatedAt = row[table.updatedAt]
-                    )
-                }
+                .map(::toCacheRecord)
                 .firstOrNull()
         }
     }
 
     fun findBySourceHash(sourceHash: String): ProfileSkinCacheRecord? {
         return databaseManager.executeTransaction {
-            table.selectAll().where { table.sourceHash eq sourceHash }
-                .map { row ->
-                    ProfileSkinCacheRecord(
-                        profileId = row[table.profileId],
-                        sourceHash = row[table.sourceHash],
-                        sourceCacheEligible = row[table.sourceCacheEligible],
-                        skinUrl = row[table.skinUrl],
-                        skinModel = row[table.skinModel],
-                        textures = ProfileSkinTextures(
-                            value = row[table.textureValue],
-                            signature = row[table.textureSignature]
-                        ),
-                        updatedAt = row[table.updatedAt]
-                    )
-                }
+            cacheTable.selectAll().where { cacheTable.sourceHash eq sourceHash }
+                .map(::toCacheRecord)
                 .filter(::isEligibleForSourceCache)
                 .maxByOrNull(ProfileSkinCacheRecord::updatedAt)
         }
     }
 
     fun save(
-        profileId: UUID,
         source: ProfileSkinSource?,
         textures: ProfileSkinTextures,
         sourceHash: String?,
         sourceCacheEligible: Boolean
     ): SaveResult {
-        val existing = findByProfileId(profileId)
-        if (shouldSkipSave(existing, source, textures, sourceHash, sourceCacheEligible)) {
-            return SaveResult.SKIPPED
-        }
-
-        if (existing == null) {
-            return try {
-                databaseManager.executeTransaction {
-                    table.insert {
-                        it[table.profileId] = profileId
-                        it[table.sourceHash] = sourceHash
-                        it[table.sourceCacheEligible] = sourceCacheEligible
-                        it[skinUrl] = source?.skinUrl
-                        it[skinModel] = source?.model
-                        it[textureValue] = textures.value
-                        it[textureSignature] = textures.signature
-                        it[updatedAt] = System.currentTimeMillis()
-                    }
-                }
-                SaveResult.INSERTED
-            } catch (e: Exception) {
-                warn { "写入皮肤缓存失败: ${e.message}" }
-                SaveResult.SKIPPED
+        val existing = if (shouldUseSharedCacheEntry(sourceHash, sourceCacheEligible)) {
+            databaseManager.executeTransaction {
+                cacheTable.selectAll().where { cacheTable.sourceHash eq sourceHash }
+                    .map(::toCacheRecord)
+                    .maxByOrNull(ProfileSkinCacheRecord::updatedAt)
             }
+        } else {
+            null
+        }
+        if (shouldSkipSave(existing, source, textures, sourceHash, sourceCacheEligible)) {
+            return SaveResult(SaveResult.Action.SKIPPED, existing!!)
         }
 
+        if (existing != null) {
+            return update(existing.skinId, source, textures, sourceHash, sourceCacheEligible)
+        }
+
+        return insert(UUID.randomUUID(), source, textures, sourceHash, sourceCacheEligible)
+    }
+
+    private fun insert(
+        skinId: UUID,
+        source: ProfileSkinSource?,
+        textures: ProfileSkinTextures,
+        sourceHash: String?,
+        sourceCacheEligible: Boolean
+    ): SaveResult {
+        val now = System.currentTimeMillis()
+        val record = ProfileSkinCacheRecord(
+            skinId = skinId,
+            sourceHash = sourceHash,
+            sourceCacheEligible = sourceCacheEligible,
+            skinUrl = source?.skinUrl,
+            skinModel = source?.model,
+            textures = textures,
+            updatedAt = now
+        )
+        return try {
+            databaseManager.executeTransaction {
+                cacheTable.insert {
+                    it[cacheTable.id] = skinId
+                    it[cacheTable.sourceHash] = sourceHash
+                    it[cacheTable.sourceCacheEligible] = sourceCacheEligible
+                    it[cacheTable.skinUrl] = source?.skinUrl
+                    it[cacheTable.skinModel] = source?.model
+                    it[cacheTable.textureValue] = textures.value
+                    it[cacheTable.textureSignature] = textures.signature
+                    it[cacheTable.updatedAt] = now
+                }
+            }
+            SaveResult(SaveResult.Action.INSERTED, record)
+        } catch (e: Exception) {
+            warn { "写入皮肤缓存失败: ${e.message}" }
+            SaveResult(SaveResult.Action.SKIPPED, record)
+        }
+    }
+
+    private fun update(
+        skinId: UUID,
+        source: ProfileSkinSource?,
+        textures: ProfileSkinTextures,
+        sourceHash: String?,
+        sourceCacheEligible: Boolean
+    ): SaveResult {
+        val now = System.currentTimeMillis()
         val updated = try {
             databaseManager.executeTransaction {
-                table.update({ table.profileId eq profileId }) {
-                    it[table.sourceHash] = sourceHash
-                        it[table.sourceCacheEligible] = sourceCacheEligible
-                    it[skinUrl] = source?.skinUrl
-                    it[skinModel] = source?.model
-                    it[textureValue] = textures.value
-                    it[textureSignature] = textures.signature
-                    it[updatedAt] = System.currentTimeMillis()
+                cacheTable.update({ cacheTable.id eq skinId }) {
+                    it[cacheTable.sourceHash] = sourceHash
+                    it[cacheTable.sourceCacheEligible] = sourceCacheEligible
+                    it[cacheTable.skinUrl] = source?.skinUrl
+                    it[cacheTable.skinModel] = source?.model
+                    it[cacheTable.textureValue] = textures.value
+                    it[cacheTable.textureSignature] = textures.signature
+                    it[cacheTable.updatedAt] = now
                 }
             } > 0
         } catch (e: Exception) {
@@ -204,11 +226,35 @@ class ProfileSkinCacheRepository(
             false
         }
 
+        val record = ProfileSkinCacheRecord(
+            skinId = skinId,
+            sourceHash = sourceHash,
+            sourceCacheEligible = sourceCacheEligible,
+            skinUrl = source?.skinUrl,
+            skinModel = source?.model,
+            textures = textures,
+            updatedAt = now
+        )
         if (updated) {
-            return SaveResult.UPDATED
+            return SaveResult(SaveResult.Action.UPDATED, record)
         }
 
-        return SaveResult.SKIPPED
+        return SaveResult(SaveResult.Action.SKIPPED, record)
+    }
+
+    private fun toCacheRecord(row: ResultRow): ProfileSkinCacheRecord {
+        return ProfileSkinCacheRecord(
+            skinId = row[cacheTable.id],
+            sourceHash = row[cacheTable.sourceHash],
+            sourceCacheEligible = row[cacheTable.sourceCacheEligible],
+            skinUrl = row[cacheTable.skinUrl],
+            skinModel = row[cacheTable.skinModel],
+            textures = ProfileSkinTextures(
+                value = row[cacheTable.textureValue],
+                signature = row[cacheTable.textureSignature]
+            ),
+            updatedAt = row[cacheTable.updatedAt]
+        )
     }
 }
 

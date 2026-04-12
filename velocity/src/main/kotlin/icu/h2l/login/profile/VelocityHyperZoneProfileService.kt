@@ -22,6 +22,7 @@
 package icu.h2l.login.profile
 
 import icu.h2l.api.db.Profile
+import icu.h2l.api.event.profile.ProfileAttachedEvent
 import icu.h2l.api.player.HyperZonePlayer
 import icu.h2l.api.profile.HyperZoneProfileResolveResult
 import icu.h2l.api.profile.HyperZoneProfileService
@@ -74,6 +75,16 @@ class VelocityHyperZoneProfileService(
     override fun attachProfile(player: HyperZonePlayer, profileId: UUID): Profile? {
         val profile = databaseHelper.getProfile(profileId) ?: return null
         attachedProfiles[player] = profile.id
+        runCatching {
+            HyperZoneLoginMain.getInstance().proxy.eventManager.fire(
+                ProfileAttachedEvent(player, profile)
+            ).join()
+        }.onFailure { throwable ->
+            HyperZoneLoginMain.getInstance().logger.error(
+                "玩家 ${player.clientOriginalName} attach Profile 事件分发失败: ${throwable.message}",
+                throwable
+            )
+        }
         (player as? VelocityHyperZonePlayer)?.onAttachedProfileAvailable()
         return profile
     }

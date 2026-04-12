@@ -19,25 +19,15 @@
  *
  */
 
-package icu.h2l.login.profile.skin.db
+package icu.h2l.api.event.profile
 
-import org.jetbrains.exposed.sql.Table
+import com.velocitypowered.api.event.annotation.AwaitingEvent
+import icu.h2l.api.db.Profile
+import icu.h2l.api.player.HyperZonePlayer
 
-class ProfileSkinCacheTable(prefix: String) : Table("${prefix}skin_cache") {
-    val id = uuid("id")
-    val sourceHash = varchar("source_hash", 64).nullable()
-    val sourceCacheEligible = bool("source_cache_eligible").nullable()
-    val skinUrl = varchar("skin_url", 1024).nullable()
-    val skinModel = varchar("skin_model", 16).nullable()
-    val textureValue = text("texture_value")
-    val textureSignature = text("texture_signature").nullable()
-    val updatedAt = long("updated_at")
-
-    init {
-        index(false, sourceHash)
-    }
-
-    override val primaryKey = PrimaryKey(id)
-}
-
+@AwaitingEvent
+class ProfileAttachedEvent(
+    val hyperZonePlayer: HyperZonePlayer,
+    val profile: Profile
+)
 

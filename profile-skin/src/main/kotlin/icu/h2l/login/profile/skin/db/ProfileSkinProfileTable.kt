@@ -21,23 +21,22 @@
 
 package icu.h2l.login.profile.skin.db
 
+import icu.h2l.api.db.table.ProfileTable
 import org.jetbrains.exposed.sql.Table
 
-class ProfileSkinCacheTable(prefix: String) : Table("${prefix}skin_cache") {
-    val id = uuid("id")
-    val sourceHash = varchar("source_hash", 64).nullable()
-    val sourceCacheEligible = bool("source_cache_eligible").nullable()
-    val skinUrl = varchar("skin_url", 1024).nullable()
-    val skinModel = varchar("skin_model", 16).nullable()
-    val textureValue = text("texture_value")
-    val textureSignature = text("texture_signature").nullable()
+class ProfileSkinProfileTable(
+    prefix: String,
+    profileTable: ProfileTable,
+    cacheTable: ProfileSkinCacheTable
+) : Table("${prefix}skin_profile") {
+    val profileId = uuid("profile_id").references(profileTable.id).uniqueIndex()
+    val skinId = uuid("skin_id").references(cacheTable.id)
     val updatedAt = long("updated_at")
 
     init {
-        index(false, sourceHash)
+        index(false, skinId)
     }
 
-    override val primaryKey = PrimaryKey(id)
+    override val primaryKey = PrimaryKey(profileId)
 }
-
 

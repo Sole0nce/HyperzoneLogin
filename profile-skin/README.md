@@ -9,7 +9,7 @@
 - 优先缓存上游已签名的皮肤数据
 - 当上游只有未签名 `textures` 且可解析出 `skinUrl` 时，按 `ref/skin/skinrestorer/SkinRestorerFlows.java` 的思路调用 MineSkin 修复
 - 当 MineSkin 的 URL 模式无法直接读取源图（例如返回 `invalid_image` / `Invalid image file size: undefined`）时，可自动退回上传模式重试
-- 将结果缓存到数据库表 `profile_skin_cache`
+- 预处理阶段将皮肤数据缓存到 `skin_cache`，并在 profile 绑定完成后写入 `skin_profile`
 - 在 `ProfileSkinPreprocessEvent` 阶段记录最近一次可用的 self `textures`，并在连接可写时直接补发一次 self `ADD_PLAYER`
 - 当上游初始 `textures` 缺失或不可用于补发时，若玩家已经绑定 `profile`，则回退到该 `profile` 的缓存皮肤继续补发 self `ADD_PLAYER`
 - 在 `PlayerFinishConfigurationEvent` 后根据最近缓存的 self `textures` 再 replay 一次 self `ADD_PLAYER`，避免 vanilla 客户端切换 configuration 生命周期后丢失自己的皮肤资料
@@ -51,15 +51,25 @@
 - `baseProfile`
 - 可写字段：`textures`
 
+### `HyperZonePlayerProfileAttachedEvent`
+
+当 `HyperZonePlayer` 成功 attach 到正式 `Profile` 后抛出：
+
+- `hyperZonePlayer`
+- `profile`
+
+`profile-skin` 会在此时把预处理阶段暂存的皮肤结果关联到 `skin_profile`，从而解决“预处理早于 attach”导致的时序问题。
+
 ## 数据表
 
 默认表名：
 
-- `${tablePrefix}profile_skin_cache`
+- `${tablePrefix}skin_cache`
+- `${tablePrefix}skin_profile`
 
-主要字段：
+`skin_cache` 主要字段：
 
-- `profile_id`
+- `id`
 - `source_hash`
 - `source_cache_eligible`
 - `skin_url`
@@ -68,15 +78,27 @@
 - `texture_signature`
 - `updated_at`
 
-说明：当前没有单独的“镜像 URL 映射表”。原因是 `profile_skin_cache` 已经通过 `source_hash = SHA-256(originalSkinUrl|model)` 缓存恢复后的 `textures`，并借助 `source_cache_eligible` 区分“可作为同源复用缓存的已恢复/可信结果”和“仅供当前 profile 回退使用的 fallback 结果”。因此同一原始源图 URL 在后续玩家命中时，会直接复用可复用缓存，而不需要再次让 MineSkin 访问原地址。
+`skin_profile` 主要字段：
+
+- `profile_id`
+- `skin_id`
+- `updated_at`
+
+说明：
+
+- `skin_cache` 只存皮肤本体，不再直接存 `profile_id`
+- `skin_profile` 只负责 `profile -> skin` 关联
+- `source_hash = SHA-256(originalSkinUrl|model)` 继续用于同源复用缓存判断
 
 ## 接入链路
 
 1. 玩家在 `auth-yggd` 完成认证
 2. `YggdrasilAuthModule` 保存初始 `GameProfile` 到 `HyperZonePlayer`
 3. `YggdrasilAuthModule` 抛出 `ProfileSkinPreprocessEvent`
-4. `profile-skin` 模块完成提取 / 修复 / 缓存，并尝试立即补发一次 self `ADD_PLAYER`
-5. 客户端完成 configuration 后，`profile-skin` 再 replay 一次 self `ADD_PLAYER`
-6. `ToBackendPacketReplacer` 与核心最终替换链路抛出 `ProfileSkinApplyEvent`
-7. 模块从缓存取回 `textures` 并写回最终 `GameProfile`
+4. `profile-skin` 模块完成提取 / 修复 / `skin_cache` 缓存，并尝试立即补发一次 self `ADD_PLAYER`
+5. 核心完成 `HyperZonePlayer -> Profile` attach 后抛出 `HyperZonePlayerProfileAttachedEvent`
+6. `profile-skin` 将预处理得到的 `skinId` 写入 `skin_profile`
+7. 客户端完成 configuration 后，`profile-skin` 再 replay 一次 self `ADD_PLAYER`
+8. `ToBackendPacketReplacer` 与核心最终替换链路抛出 `ProfileSkinApplyEvent`
+9. 模块先查 `skin_profile`，再回到 `skin_cache` 取回 `textures` 并写回最终 `GameProfile`
 

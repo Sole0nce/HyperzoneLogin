@@ -26,7 +26,6 @@ import com.velocitypowered.api.event.player.GameProfileRequestEvent
 import icu.h2l.api.connection.disconnectWithMessage
 import icu.h2l.api.event.connection.OpenStartAuthEvent
 import icu.h2l.api.event.connection.OpenPreLoginEvent
-import icu.h2l.api.event.profile.ProfileResolveEvent
 import icu.h2l.api.util.RemapUtils
 import icu.h2l.login.HyperZoneLoginMain
 import icu.h2l.login.manager.HyperZonePlayerManager
@@ -46,42 +45,6 @@ class EventListener {
     fun onPreLoginChannelInit(event: OpenPreLoginEvent) {
         // Run last so other listeners can finish deciding the player's online/offline mode.
         HyperZonePlayerManager.create(event.channel, event.userName, event.uuid, event.isOnline)
-    }
-
-
-    @Subscribe
-    fun onProfileResolve(event: ProfileResolveEvent) {
-        val databaseHelper = HyperZoneLoginMain.getInstance().databaseHelper
-
-        event.profileIdHint?.let { profileId ->
-            val profile = databaseHelper.getProfile(profileId)
-            if (profile == null) {
-                event.deny("未找到指定的 Profile: $profileId")
-            } else {
-                event.resolve(profile)
-            }
-            return
-        }
-
-        val trustedName = event.trustedName
-        val trustedUuid = event.trustedUuid
-        if (trustedName.isNullOrBlank() || trustedUuid == null) {
-            event.deny("缺少可信的 Profile 解析参数")
-            return
-        }
-
-        val resolved = if (event.allowCreate) {
-            databaseHelper.resolveOrCreateTrustedProfile(trustedName, trustedUuid)
-        } else {
-            databaseHelper.resolveTrustedProfile(trustedName, trustedUuid)
-        }
-
-        val profile = resolved.profile
-        if (profile != null) {
-            event.resolve(profile, resolved.created)
-        } else {
-            event.deny(resolved.reason ?: "Profile 解析失败")
-        }
     }
 
     @Subscribe

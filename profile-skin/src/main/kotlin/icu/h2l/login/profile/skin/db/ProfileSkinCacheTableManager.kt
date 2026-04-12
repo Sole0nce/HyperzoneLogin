@@ -30,20 +30,22 @@ import org.jetbrains.exposed.sql.SchemaUtils
 
 class ProfileSkinCacheTableManager(
     private val databaseManager: HyperZoneDatabaseManager,
-    val table: ProfileSkinCacheTable
+    val cacheTable: ProfileSkinCacheTable,
+    val profileTable: ProfileSkinProfileTable
 ) {
     @Suppress("DEPRECATION")
     fun createTable() {
         databaseManager.executeTransaction {
             // 这里先用 Exposed 的补表补列能力平滑升级既有安装，后续如引入正式迁移框架再替换。
-            SchemaUtils.createMissingTablesAndColumns(table)
+            SchemaUtils.createMissingTablesAndColumns(cacheTable, profileTable)
         }
     }
 
     fun dropTable() {
         databaseManager.executeTransaction {
-            SchemaUtils.drop(table)
-            warn { "已删除表: ${table.tableName}" }
+            SchemaUtils.drop(profileTable, cacheTable)
+            warn { "已删除表: ${profileTable.tableName}" }
+            warn { "已删除表: ${cacheTable.tableName}" }
         }
     }
 

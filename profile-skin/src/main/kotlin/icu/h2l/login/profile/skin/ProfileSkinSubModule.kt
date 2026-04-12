@@ -31,11 +31,15 @@ import icu.h2l.login.profile.skin.config.ProfileSkinConfigLoader
 import icu.h2l.login.profile.skin.db.ProfileSkinCacheRepository
 import icu.h2l.login.profile.skin.db.ProfileSkinCacheTable
 import icu.h2l.login.profile.skin.db.ProfileSkinCacheTableManager
+import icu.h2l.login.profile.skin.db.ProfileSkinProfileRepository
+import icu.h2l.login.profile.skin.db.ProfileSkinProfileTable
 import icu.h2l.login.profile.skin.service.ProfileSkinSelfReplayService
 import icu.h2l.login.profile.skin.service.ProfileSkinService
+
 class ProfileSkinSubModule : HyperSubModule {
     lateinit var tableManager: ProfileSkinCacheTableManager
-    lateinit var repository: ProfileSkinCacheRepository
+    lateinit var cacheRepository: ProfileSkinCacheRepository
+    lateinit var profileRepository: ProfileSkinProfileRepository
     lateinit var service: ProfileSkinService
     lateinit var selfReplayService: ProfileSkinSelfReplayService
 
@@ -44,22 +48,33 @@ class ProfileSkinSubModule : HyperSubModule {
         val dataDirectory = api.dataDirectory
         val databaseManager: HyperZoneDatabaseManager = api.databaseManager
         val config = ProfileSkinConfigLoader.load(dataDirectory)
-        val table = ProfileSkinCacheTable(
+        val cacheTable = ProfileSkinCacheTable(
+            prefix = databaseManager.tablePrefix
+        )
+        val profileTable = ProfileSkinProfileTable(
             prefix = databaseManager.tablePrefix,
-            profileTable = ProfileTable(databaseManager.tablePrefix)
+            profileTable = ProfileTable(databaseManager.tablePrefix),
+            cacheTable = cacheTable
         )
 
-        tableManager = ProfileSkinCacheTableManager(databaseManager, table)
-        repository = ProfileSkinCacheRepository(databaseManager, table)
-        service = ProfileSkinService(config, repository, HyperZoneProfileServiceProvider.get())
-        selfReplayService = ProfileSkinSelfReplayService(api, config, repository, HyperZoneProfileServiceProvider.get())
+        tableManager = ProfileSkinCacheTableManager(databaseManager, cacheTable, profileTable)
+        cacheRepository = ProfileSkinCacheRepository(databaseManager, cacheTable)
+        profileRepository = ProfileSkinProfileRepository(databaseManager, profileTable)
+        service = ProfileSkinService(config, cacheRepository, profileRepository, HyperZoneProfileServiceProvider.get())
+        selfReplayService = ProfileSkinSelfReplayService(
+            api,
+            config,
+            cacheRepository,
+            profileRepository,
+            HyperZoneProfileServiceProvider.get()
+        )
 
         tableManager.createTable()
         proxy.eventManager.register(api, tableManager)
         proxy.eventManager.register(api, service)
         proxy.eventManager.register(api, selfReplayService)
 
-        info { "ProfileSkinSubModule 已加载，皮肤缓存、修复与 self replay 监听器已注册" }
+        info { "ProfileSkinSubModule 已加载，skin_cache / skin_profile、皮肤修复与 self replay 监听器已注册" }
     }
 }
 

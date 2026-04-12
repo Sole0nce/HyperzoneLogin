@@ -39,6 +39,7 @@ import icu.h2l.api.profile.HyperZoneProfileService
 import icu.h2l.api.profile.skin.ProfileSkinTextures
 import icu.h2l.login.profile.skin.config.ProfileSkinConfig
 import icu.h2l.login.profile.skin.db.ProfileSkinCacheRepository
+import icu.h2l.login.profile.skin.db.ProfileSkinProfileRepository
 import java.util.EnumSet
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -52,7 +53,8 @@ private class SelfSkinReplayState {
 class ProfileSkinSelfReplayService(
     private val api: HyperZoneApi,
     private val config: ProfileSkinConfig,
-    private val repository: ProfileSkinCacheRepository,
+    private val cacheRepository: ProfileSkinCacheRepository,
+    private val profileRepository: ProfileSkinProfileRepository,
     private val profileService: HyperZoneProfileService
 ) {
     private val replayStates = ConcurrentHashMap<HyperZonePlayer, SelfSkinReplayState>()
@@ -156,9 +158,10 @@ class ProfileSkinSelfReplayService(
         }
 
         val profileId = profileService.getAttachedProfile(hyperZonePlayer)?.id ?: return null
-        val cached = repository.findByProfileId(profileId)?.textures?.takeIf(::canReplayTextures) ?: return null
+        val skinId = profileRepository.findSkinIdByProfileId(profileId) ?: return null
+        val cached = cacheRepository.findBySkinId(skinId)?.textures?.takeIf(::canReplayTextures) ?: return null
         debug {
-            "[ProfileSkinFlow] self replay fallback to cached profile textures: clientOriginal=${hyperZonePlayer.clientOriginalName}, profile=$profileId, valueLength=${cached.value.length}, signed=${cached.isSigned}"
+            "[ProfileSkinFlow] self replay fallback to cached profile textures: clientOriginal=${hyperZonePlayer.clientOriginalName}, profile=$profileId, skin=$skinId, valueLength=${cached.value.length}, signed=${cached.isSigned}"
         }
         return cached
     }
