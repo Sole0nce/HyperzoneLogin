@@ -23,26 +23,27 @@ package icu.h2l.login.auth.offline.command
 
 import com.velocitypowered.api.proxy.Player
 import icu.h2l.api.command.HyperChatCommandInvocation
+import icu.h2l.login.auth.offline.OfflineAuthMessages
 import icu.h2l.login.auth.offline.service.OfflineAuthService
 
 class RegisterCommand(
 	private val authService: OfflineAuthService
-) : BasePlaceholderAuthCommand("/register <password> <password>") {
+) : BasePlaceholderAuthCommand(OfflineAuthMessages.REGISTER_USAGE) {
 	override fun execute(invocation: HyperChatCommandInvocation) {
 		val source = invocation.source()
 		if (source !is Player) {
-			source.sendPlainMessage("§c该命令只能由玩家执行")
+			source.sendPlainMessage(OfflineAuthMessages.ONLY_PLAYER)
 			return
 		}
 
 		val args = invocation.arguments()
 		if (args.size != 2) {
-			source.sendPlainMessage("§e/register <password> <password>")
+			source.sendPlainMessage(OfflineAuthMessages.REGISTER_USAGE)
 			return
 		}
 
 		if (args[0] != args[1]) {
-			source.sendPlainMessage("§c两次密码不一致")
+			source.sendPlainMessage(OfflineAuthMessages.PASSWORD_MISMATCH)
 			return
 		}
 

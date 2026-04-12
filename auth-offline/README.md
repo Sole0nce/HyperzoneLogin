@@ -3,7 +3,7 @@ Auth Offline 模块 (hzl-auth-offline)
 
 目的
 ----
-本模块为 HyperZoneLogin 提供「本地/离线」账号管理：支持玩家通过服务器内部存储的账号进行注册、登录、绑定、修改密码以及注销等操作。适用于不连接 Mojang/Yggdrasil 或需要额外本地账号的环境。
+本模块为 HyperZoneLogin 提供「本地/离线」账号管理：支持玩家通过服务器内部存储的账号进行注册、登录、修改密码以及注销等操作；当玩家已通过其他渠道拥有档案时，`/register` 会自动尝试完成离线密码绑定。适用于不连接 Mojang/Yggdrasil 或需要额外本地账号的环境。
 
 如何使用（运行时集成，*不包含构建步骤*）
 -----------------------------------
@@ -17,7 +17,7 @@ Auth Offline 模块 (hzl-auth-offline)
   - 使用 `OfflineAuthTableManager` 管理离线认证表结构，启动时会尝试创建所需表并监听表事件。表名按 `databaseManager.tablePrefix` 进行前缀化。
   - `OfflineAuthRepository` 封装对离线认证记录的 CRUD 操作（按用户名或 profileId 查询）。
 - 服务逻辑：
-  - `OfflineAuthService` 提供核心逻辑：register、bind、login、changePassword、unregister 等方法。
+  - `OfflineAuthService` 提供核心逻辑：register（必要时自动尝试绑定已有档案的离线密码）、login、changePassword、unregister 等方法。
   - 密码处理支持多种存储格式：plain、sha256、authme（兼容 AuthMe 风格的存储），默认使用 sha256。
   - 密码校验逻辑位于 `OfflineAuthService.verifyPassword` 和 `verifyAuthMe` 中；内部使用 SHA-256 hex 编码（见 `sha256Hex`）。
   - 支持邮箱绑定与找回密码；恢复邮件可走 `LOG` 或 `SMTP` 投递模式，SMTP 基于 Jakarta Mail / Angus Mail 运行库。
@@ -35,9 +35,7 @@ Auth Offline 模块 (hzl-auth-offline)
 - /login <password> [code]
   - 用法：立即使用指定密码尝试登录（适用于已注册账号）；若账号启用了 TOTP，则必须额外提供验证码。
 - /register <password>
-  - 用法：为当前连接的玩家创建一个离线账号并自动登录（若允许注册）。
-- /bind <password>
-  - 用法：将当前玩家已有的 profile 与离线账号绑定（在已通过其他渠道验证后使用）。
+  - 用法：为当前连接的玩家创建一个离线账号并自动登录；如果检测到玩家已通过其他渠道拥有档案，则会自动尝试把离线密码绑定到该档案。
 - /changepassword <old> <new>
   - 用法：修改当前玩家的离线账号密码（需提供旧密码）。
 - /logout
@@ -70,8 +68,7 @@ Auth Offline 模块 (hzl-auth-offline)
 | 命令 | 说明 | 所需权限 |
 |------|------|----------|
 | /login | 登录本地账号 | 无（玩家可自用） |
-| /register | 注册本地账号并登录 | 无（但会根据玩家状态限制） |
-| /bind | 绑定 profile 与本地账号 | 无（需玩家先完成其他验证） |
+| /register | 注册本地账号并登录；必要时自动把离线密码绑定到已有档案 | 无（但会根据玩家状态限制） |
 | /changepassword | 修改密码 | 无（需提供旧密码） |
 | /logout | 注销会话 | 无 |
 | /unregister | 注销账号 | 无（需提供密码） |

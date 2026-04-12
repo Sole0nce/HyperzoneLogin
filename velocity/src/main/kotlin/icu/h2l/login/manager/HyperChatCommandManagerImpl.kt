@@ -89,7 +89,7 @@ object HyperChatCommandManagerImpl : HyperChatCommandManager {
 
         val registration = commands[label] ?: run {
             if (hyperPlayer != null && hyperPlayer.isInWaitingArea()) {
-                source.sendMessage(Component.text("§e认证阶段仅可使用 /login、/register、/bind、/changepassword、/email 等认证命令"))
+                source.sendMessage(Component.text("§e认证阶段仅可使用 /login、/register、/changepassword、/email、/totp 等认证命令"))
                 return true
             }
             return false

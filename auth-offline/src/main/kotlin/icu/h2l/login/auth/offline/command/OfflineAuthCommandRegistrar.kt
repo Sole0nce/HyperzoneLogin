@@ -48,14 +48,6 @@ object OfflineAuthCommandRegistrar {
         )
         commandManager.register(
             HyperChatCommandRegistration(
-                name = "bind",
-                aliases = setOf("b"),
-                executor = BindCommand(authService),
-                brigadier = OfflineAuthBrigadierCommands.bind()
-            )
-        )
-        commandManager.register(
-            HyperChatCommandRegistration(
                 name = "changepassword",
                 aliases = setOf("cpass", "changepass"),
                 executor = ChangePasswordCommand(authService),

@@ -53,64 +53,91 @@ class OfflineAuthService(
         val hyperZonePlayer = playerAccessor.getByPlayer(player)
         val username = hyperZonePlayer.userName
         val normalizedName = username.lowercase()
-        if (!hyperZonePlayer.canResolveOrCreateProfile()) {
-            return Result(false, "§c其他渠道已注册，如有需要，请进行绑定")
-        }
-
-        if (repository.getByName(normalizedName) != null) {
-            return Result(false, OfflineAuthMessages.REGISTER_REPEAT)
-        }
-
-        validatePassword(username, password)?.let {
-            return it
-        }
-
-        val profile = hyperZonePlayer.resolveOrCreateProfile()
-        val hash = hashPassword(password)
-        val created = repository.create(
-            name = normalizedName,
-            passwordHash = hash,
-            hashFormat = HASH_FORMAT_SHA256,
-            profileId = profile.id
-        )
-        return if (created) {
-            hyperZonePlayer.overVerify()
-            if (OfflineAuthConfigLoader.getConfig().session.enabled && OfflineAuthConfigLoader.getConfig().session.issueOnRegister) {
-                issueSession(profile.id, player)
+        if (hyperZonePlayer.canResolveOrCreateProfile()) {
+            if (repository.getByName(normalizedName) != null) {
+                return Result(false, OfflineAuthMessages.OFFLINE_PASSWORD_ALREADY_SET)
             }
-            Result(true, OfflineAuthMessages.REGISTER_SUCCESS)
-        } else {
-            Result(false, OfflineAuthMessages.REGISTER_FAILED)
+
+            validatePassword(username, password)?.let {
+                return it
+            }
+
+            val profile = hyperZonePlayer.resolveOrCreateProfile()
+            return createOfflinePasswordEntry(
+                player = player,
+                hyperZonePlayer = hyperZonePlayer,
+                normalizedName = normalizedName,
+                password = password,
+                profileId = profile.id,
+                successMessage = OfflineAuthMessages.REGISTER_SUCCESS,
+                failureMessage = OfflineAuthMessages.REGISTER_FAILED,
+                markVerified = true,
+                issueSession = OfflineAuthConfigLoader.getConfig().session.enabled &&
+                    OfflineAuthConfigLoader.getConfig().session.issueOnRegister
+            )
         }
+
+        return bindExistingProfile(player, hyperZonePlayer, username, normalizedName, password)
     }
 
-    fun bind(player: Player, password: String): Result {
-        val hyperZonePlayer = playerAccessor.getByPlayer(player)
-        val username = hyperZonePlayer.userName
-        val normalizedName = username.lowercase()
+    private fun bindExistingProfile(
+        player: Player,
+        hyperZonePlayer: icu.h2l.api.player.HyperZonePlayer,
+        username: String,
+        normalizedName: String,
+        password: String
+    ): Result {
         if (!hyperZonePlayer.canBind()) {
-            return Result(false, OfflineAuthMessages.DENIED_COMMAND)
+            return Result(false, OfflineAuthMessages.REGISTER_BIND_DENIED)
         }
 
-        val profile = hyperZonePlayer.getDBProfile() ?: return Result(false, "§c未找到档案，无法绑定")
+        val profile = hyperZonePlayer.getDBProfile() ?: return Result(false, OfflineAuthMessages.REGISTER_BIND_PROFILE_MISSING)
         if (repository.getByProfileId(profile.id) != null || repository.getByName(normalizedName) != null) {
-            return Result(false, "§c已绑定，无需重复绑定")
+            return Result(false, OfflineAuthMessages.OFFLINE_PASSWORD_ALREADY_SET)
         }
 
         validatePassword(username, password)?.let {
             return it
         }
 
+        return createOfflinePasswordEntry(
+            player = player,
+            hyperZonePlayer = hyperZonePlayer,
+            normalizedName = normalizedName,
+            password = password,
+            profileId = profile.id,
+            successMessage = OfflineAuthMessages.REGISTER_BOUND_SUCCESS,
+            failureMessage = OfflineAuthMessages.REGISTER_FAILED
+        )
+    }
+
+    private fun createOfflinePasswordEntry(
+        player: Player,
+        hyperZonePlayer: icu.h2l.api.player.HyperZonePlayer,
+        normalizedName: String,
+        password: String,
+        profileId: java.util.UUID,
+        successMessage: String,
+        failureMessage: String,
+        markVerified: Boolean = false,
+        issueSession: Boolean = false
+    ): Result {
         val created = repository.create(
             name = normalizedName,
             passwordHash = hashPassword(password),
             hashFormat = HASH_FORMAT_SHA256,
-            profileId = profile.id
+            profileId = profileId
         )
         return if (created) {
-            Result(true, "§a绑定成功")
+            if (markVerified) {
+                hyperZonePlayer.overVerify()
+            }
+            if (issueSession) {
+                issueSession(profileId, player)
+            }
+            Result(true, successMessage)
         } else {
-            Result(false, "§c绑定失败，请稍后再试")
+            Result(false, failureMessage)
         }
     }
 
@@ -469,7 +496,7 @@ class OfflineAuthService(
         if (entry == null) {
             prompts += OfflineAuthMessages.REGISTER_REQUEST
             if (!hyperPlayer.canResolveOrCreateProfile()) {
-                prompts += "§8[§6玩家系统§8] §e检测到你已有档案，可使用 /bind <密码> <再次输入密码> 绑定离线密码"
+                prompts += OfflineAuthMessages.REGISTER_BIND_HINT
             }
             return prompts
         }

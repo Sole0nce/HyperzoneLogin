@@ -62,9 +62,6 @@ object OfflineAuthBrigadierCommands {
         return doublePasswordCommand("register", "password", "confirmPassword")
     }
 
-    fun bind(): HyperChatBrigadierRegistration {
-        return doublePasswordCommand("bind", "password", "confirmPassword")
-    }
 
     fun changePassword(): HyperChatBrigadierRegistration {
         return HyperChatBrigadierRegistration { context ->

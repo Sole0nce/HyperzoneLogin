@@ -46,6 +46,16 @@ dependencies {
 
     testImplementation(platform(libs.junitBom))
     testImplementation(libs.junitJupiter)
+    testImplementation(project(":api"))
+    testImplementation(libs.velocityApi)
+    testImplementation(libs.nettyAll)
+    testImplementation(libs.exposedCore)
+    testImplementation(libs.exposedJdbc)
+    testImplementation(libs.h2)
+    testImplementation(libs.configurateHocon)
+    testImplementation(libs.configurateExtraKotlin)
+    testImplementation(libs.googleAuth)
+    testImplementation("io.mockk:mockk:1.13.17")
     testRuntimeOnly(libs.junitPlatformLauncher)
 }
 
