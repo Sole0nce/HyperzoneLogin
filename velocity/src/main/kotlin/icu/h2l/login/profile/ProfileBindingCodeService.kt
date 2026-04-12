@@ -49,6 +49,7 @@ class ProfileBindingCodeService(
 
     private val secureRandom = SecureRandom()
     private val codeLocks = ConcurrentHashMap<String, ReentrantLock>()
+    private val profileLocks = ConcurrentHashMap<String, ReentrantLock>()
 
     private fun messages() = runCatching {
         HyperZoneLoginMain.getInstance().messageService
@@ -63,18 +64,32 @@ class ProfileBindingCodeService(
                     ?: Component.text("当前没有已绑定的档案，无法生成绑定码")
             )
 
-        repeat(10) {
-            val code = randomCode()
-            if (repository.createOrReplace(code, attachedProfile.id, System.currentTimeMillis())) {
-                return Result(true, generatedMessage(code, attachedProfile.name))
+        val lockKey = attachedProfile.id.toString()
+        val lock = profileLocks.computeIfAbsent(lockKey) { ReentrantLock() }
+        try {
+            return lock.withLock {
+                repository.findCode(attachedProfile.id)?.let { existingCode ->
+                    return@withLock Result(true, existingCodeMessage(existingCode, attachedProfile.name))
+                }
+
+                repeat(10) {
+                    val code = randomCode()
+                    if (repository.createOrReplace(code, attachedProfile.id, System.currentTimeMillis())) {
+                        return@withLock Result(true, generatedMessage(code, attachedProfile.name))
+                    }
+                }
+
+                Result(
+                    false,
+                    messages?.render(player, MessageKeys.BindCode.GENERATE_FAILED)
+                        ?: Component.text("生成绑定码失败，请稍后再试")
+                )
+            }
+        } finally {
+            if (!lock.isLocked && !lock.hasQueuedThreads()) {
+                profileLocks.remove(lockKey, lock)
             }
         }
-
-        return Result(
-            false,
-            messages?.render(player, MessageKeys.BindCode.GENERATE_FAILED)
-                ?: Component.text("生成绑定码失败，请稍后再试")
-        )
     }
 
     fun use(player: HyperZonePlayer, rawCode: String): Result {
@@ -172,10 +187,39 @@ class ProfileBindingCodeService(
     }
 
     private fun generatedMessage(code: String, profileName: String): Component {
+        return bindingCodeMessage(
+            code = code,
+            profileName = profileName,
+            headerKey = MessageKeys.BindCode.GENERATED_HEADER,
+            footerKey = MessageKeys.BindCode.GENERATED_FOOTER,
+            defaultHeader = "绑定码已生成，可发送给待绑定玩家：",
+            defaultFooter = "目标档案：$profileName ；该绑定码使用一次后立即失效。"
+        )
+    }
+
+    private fun existingCodeMessage(code: String, profileName: String): Component {
+        return bindingCodeMessage(
+            code = code,
+            profileName = profileName,
+            headerKey = MessageKeys.BindCode.EXISTING_HEADER,
+            footerKey = MessageKeys.BindCode.EXISTING_FOOTER,
+            defaultHeader = "你已经有一个可用的绑定码，可直接让待绑定玩家使用：",
+            defaultFooter = "目标档案：$profileName ；无需重新生成，该绑定码使用一次后立即失效。"
+        )
+    }
+
+    private fun bindingCodeMessage(
+        code: String,
+        profileName: String,
+        headerKey: String,
+        footerKey: String,
+        defaultHeader: String,
+        defaultFooter: String
+    ): Component {
         val messages = messages()
         if (messages == null) {
             return Component.empty()
-                .append(Component.text("绑定码已生成，可发送给待绑定玩家：", NamedTextColor.YELLOW))
+                .append(Component.text(defaultHeader, NamedTextColor.YELLOW))
                 .append(Component.newline())
                 .append(
                     Component.text(code, NamedTextColor.AQUA, TextDecoration.BOLD)
@@ -184,10 +228,10 @@ class ProfileBindingCodeService(
                         .insertion(code)
                 )
                 .append(Component.newline())
-                .append(Component.text("目标档案：$profileName ；该绑定码使用一次后立即失效。", NamedTextColor.GRAY))
+                .append(Component.text(defaultFooter, NamedTextColor.GRAY))
         }
         return Component.empty()
-            .append(messages.render(MessageKeys.BindCode.GENERATED_HEADER))
+            .append(messages.render(headerKey))
             .append(Component.newline())
             .append(
                 Component.text(code, NamedTextColor.AQUA, TextDecoration.BOLD)
@@ -198,7 +242,7 @@ class ProfileBindingCodeService(
             .append(Component.newline())
             .append(
                 messages.render(
-                    MessageKeys.BindCode.GENERATED_FOOTER,
+                    footerKey,
                     HyperZoneMessagePlaceholder.text("profile_name", profileName)
                 )
             )

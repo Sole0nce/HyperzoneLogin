@@ -50,6 +50,15 @@ class BindingCodeRepository(
         }
     }
 
+    override fun findCode(profileId: UUID): String? {
+        return databaseManager.executeTransaction {
+            table.selectAll().where { table.profileId eq profileId }
+                .limit(1)
+                .map { it[table.code] }
+                .firstOrNull()
+        }
+    }
+
     override fun findProfileId(code: String): UUID? {
         return databaseManager.executeTransaction {
             table.selectAll().where { table.code eq code }

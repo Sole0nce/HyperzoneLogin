@@ -27,6 +27,8 @@ import icu.h2l.api.profile.HyperZoneCredential
 import icu.h2l.api.profile.HyperZoneProfileService
 import icu.h2l.login.database.BindingCodeStore
 import net.kyori.adventure.text.Component
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -55,6 +57,41 @@ class ProfileBindingCodeServiceTest {
     }
 
     @Test
+    fun `generate creates code for attached profile`() {
+        val profileId = UUID.fromString("11111111-1111-1111-1111-111111111111")
+        profileService.attachedProfile = Profile(
+            id = profileId,
+            name = "BoundPlayer",
+            uuid = UUID.fromString("22222222-2222-2222-2222-222222222222")
+        )
+
+        val result = bindingCodeService.generate(hyperZonePlayer)
+
+        assertTrue(result.success)
+        assertEquals(1, repository.createOrReplaceCalls)
+        assertEquals(profileId, repository.codes.values.single())
+        assertEquals(10, repository.codes.keys.single().length)
+    }
+
+    @Test
+    fun `generate reuses existing code for attached profile`() {
+        val profileId = UUID.fromString("11111111-1111-1111-1111-111111111111")
+        profileService.attachedProfile = Profile(
+            id = profileId,
+            name = "BoundPlayer",
+            uuid = UUID.fromString("22222222-2222-2222-2222-222222222222")
+        )
+        repository.codes["EXISTING1"] = profileId
+
+        val result = bindingCodeService.generate(hyperZonePlayer)
+
+        assertTrue(result.success)
+        assertEquals(0, repository.createOrReplaceCalls)
+        assertEquals(setOf("EXISTING1"), repository.codes.keys)
+        assertTrue(PlainTextComponentSerializer.plainText().serialize(result.message).contains("EXISTING1"))
+    }
+
+    @Test
     fun `use binds credentials consumes code and attaches profile`() {
         val profileId = UUID.fromString("11111111-1111-1111-1111-111111111111")
         val profile = Profile(
@@ -80,12 +117,16 @@ class ProfileBindingCodeServiceTest {
 
     private class FakeBindingCodeStore : BindingCodeStore {
         val codes = LinkedHashMap<String, UUID>()
+        var createOrReplaceCalls: Int = 0
 
         override fun createOrReplace(code: String, profileId: UUID, createdAt: Long): Boolean {
+            createOrReplaceCalls++
             codes.entries.removeIf { it.value == profileId }
             codes[code] = profileId
             return true
         }
+
+        override fun findCode(profileId: UUID): String? = codes.entries.firstOrNull { it.value == profileId }?.key
 
         override fun findProfileId(code: String): UUID? = codes[code]
 

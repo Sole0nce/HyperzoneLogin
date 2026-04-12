@@ -26,6 +26,8 @@ import java.util.UUID
 interface BindingCodeStore {
     fun createOrReplace(code: String, profileId: UUID, createdAt: Long): Boolean
 
+    fun findCode(profileId: UUID): String?
+
     fun findProfileId(code: String): UUID?
 
     fun consume(code: String): Boolean

@@ -39,6 +39,8 @@ object MessageKeys {
         const val COMMAND_USE_USAGE = "bindcode.command-use-usage"
         const val GENERATE_NO_PROFILE = "bindcode.generate.no-profile"
         const val GENERATE_FAILED = "bindcode.generate.failed"
+        const val EXISTING_HEADER = "bindcode.existing.header"
+        const val EXISTING_FOOTER = "bindcode.existing.footer"
         const val GENERATED_HEADER = "bindcode.generated.header"
         const val GENERATED_HOVER_COPY = "bindcode.generated.hover-copy"
         const val GENERATED_FOOTER = "bindcode.generated.footer"
