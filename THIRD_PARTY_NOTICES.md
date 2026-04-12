@@ -33,3 +33,21 @@ HyperZoneLogin 使用 [`jar-relocator`](https://github.com/lucko/jar-relocator) 
 - 原项目许可证：Apache License 2.0
 - 原作者：Luck 及 contributors
 
+## SkinsRestorer
+
+HyperZoneLogin 在 `profile-skin` 模块中的 MineSkin 成功响应签名校验与兼容解析，参考并部分改编自 [`SkinsRestorer`](https://github.com/SkinsRestorer/SkinsRestorer) 当前源码中的 MineSkin 处理实现。
+
+- 原项目许可证：GNU General Public License v3.0 or later
+- 原作者：SkinsRestorer Team 及 contributors
+
+本仓库中下列文件包含基于 SkinsRestorer 思路改编的实现或说明：
+
+- `profile-skin/src/main/kotlin/icu/h2l/login/profile/skin/service/ProfileSkinService.kt`
+- `profile-skin/README.md`
+
+这些改编内容用于在 `profile-skin` 模块中：
+
+- 对齐 MineSkin 成功结果“必须同时包含 `value` 与 `signature`”的约束
+- 兼容旧版 `data.texture` 与 SkinsRestorer 当前使用的 `skin.texture.data` 响应结构
+- 避免把无法安全注入到 Velocity `GameProfile.Property` 的半残 textures 写入缓存
+

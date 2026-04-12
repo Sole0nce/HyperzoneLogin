@@ -7,8 +7,9 @@
 - 在 `auth-yggd` 成功认证后抛出 `ProfileSkinPreprocessEvent`
 - 从上游 `GameProfile` 提取 `textures` / 皮肤源 URL / 模型
 - 优先缓存上游已签名的皮肤数据
-- 当上游只有未签名 `textures` 且可解析出 `skinUrl` 时，按 `ref/skin/skinrestorer/SkinRestorerFlows.java` 的思路调用 MineSkin 修复
+- 当上游只有未签名 `textures` 且可解析出 `skinUrl` 时，参考 `ref/SkinsRestorer/shared/src/main/java/net/skinsrestorer/shared/connections/MineSkinAPIImpl.java` 的 MineSkin 处理思路进行修复
 - 当 MineSkin 的 URL 模式无法直接读取源图（例如返回 `invalid_image` / `Invalid image file size: undefined`）时，可自动退回上传模式重试
+- 解析 MineSkin 恢复结果时兼容旧版 `data.texture` 与 SkinsRestorer 当前使用的 `skin.texture.data` 成功响应结构，并强制要求 `value` 与 `signature` 同时存在
 - 预处理阶段将皮肤数据缓存到 `skin_cache`，并在 profile 绑定完成后写入 `skin_profile`
 - 在 `ProfileSkinPreprocessEvent` 阶段记录最近一次可用的 self `textures`，并在连接可写时直接补发一次 self `ADD_PLAYER`
 - 当上游初始 `textures` 缺失或不可用于补发时，若玩家已经绑定 `profile`，则回退到该 `profile` 的缓存皮肤继续补发 self `ADD_PLAYER`
@@ -30,6 +31,13 @@
 - `mineSkin.retryUploadOnUrlReadFailure`：URL 模式遇到 MineSkin 远端读图失败时，是否自动改走上传模式
 
 说明：self replay 能力仍受核心 `misc.enableReplaceGameProfile` 开关约束；只有开启档案替换时，模块才会向客户端补发 self `ADD_PLAYER`。
+
+## 与 SkinsRestorer 的对比
+
+- 当前 `ref/SkinsRestorer` 源码里的 MineSkin 入口是 `/v2/generate`，成功响应会把 `skin.texture.data.value` 与 `skin.texture.data.signature` 直接组装成必须带签名的 `SkinProperty`
+- `profile-skin` 原先上传/URL 恢复逻辑使用的是旧版 `generate/url` 与 `generate/upload` 返回结构 `data.texture`，并允许把缺失 `signature` 的结果解析为 `ProfileSkinTextures`
+- 现已对齐为：MineSkin 恢复结果必须包含非空 `signature` 才能进入缓存，同时兼容两种响应结构，避免把无法注入到 Velocity 的半残 `textures` 持久化
+- 相关第三方参考与改编说明见根目录 `THIRD_PARTY_NOTICES.md` 中的 `SkinsRestorer` 条目
 
 ## API 事件
 

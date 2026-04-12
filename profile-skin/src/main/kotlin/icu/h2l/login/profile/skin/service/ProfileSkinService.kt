@@ -111,6 +111,35 @@ internal fun sanitizeFallbackSourceHash(
     return if (shouldForceRestoreSignedTextures) null else sourceHash
 }
 
+/**
+ * MineSkin 成功响应中的签名约束参考并对齐自 SkinsRestorer：
+ * - `ref/SkinsRestorer/shared/src/main/java/net/skinsrestorer/shared/connections/MineSkinAPIImpl.java`
+ * - `ref/SkinsRestorer/shared/src/main/java/net/skinsrestorer/shared/connections/mineskin/responses/MineSkinUrlResponse.java`
+ * - `ref/SkinsRestorer/api/src/main/java/net/skinsrestorer/api/property/SkinProperty.java`
+ *
+ * SkinsRestorer 在成功路径上会把 MineSkin 返回的 `value + signature` 直接组装成必填签名的 `SkinProperty`；
+ * 这里也在恢复阶段立即拒绝缺签名响应，避免把不可注入的半残 textures 写入缓存。
+ */
+internal fun parseRestoredMineSkinTextures(body: String): ProfileSkinTextures {
+    val root = JsonParser.parseString(body).asJsonObject
+    if (root.getAsJsonPrimitive("success")?.asBoolean == false) {
+        throw IllegalStateException("MineSkin response indicates failure: $body")
+    }
+
+    val texture = root.getAsJsonObject("data")
+        ?.getAsJsonObject("texture")
+        ?: root.getAsJsonObject("skin")
+            ?.getAsJsonObject("texture")
+            ?.getAsJsonObject("data")
+        ?: throw IllegalStateException("MineSkin response missing signed texture payload: $body")
+
+    val value = texture.getAsJsonPrimitive("value")?.asString?.takeIf { it.isNotBlank() }
+        ?: throw IllegalStateException("MineSkin response missing value: $body")
+    val signature = texture.getAsJsonPrimitive("signature")?.asString?.takeIf { it.isNotBlank() }
+        ?: throw IllegalStateException("MineSkin response missing signature: $body")
+    return ProfileSkinTextures(value = value, signature = signature)
+}
+
 class ProfileSkinService(
     private val config: ProfileSkinConfig,
     private val cacheRepository: ProfileSkinCacheRepository,
@@ -279,7 +308,7 @@ class ProfileSkinService(
             MineSkinMethod.URL -> restoreByUrlWithUploadRetry(source)
             MineSkinMethod.UPLOAD -> restoreByUpload(source)
         }
-        return parseMineSkinResponse(body)
+        return parseRestoredMineSkinTextures(body)
     }
 
     private fun restoreByUrlWithUploadRetry(source: ProfileSkinSource): String {
@@ -367,17 +396,6 @@ class ProfileSkinService(
         return response.body()
     }
 
-    private fun parseMineSkinResponse(body: String): ProfileSkinTextures {
-        val root = JsonParser.parseString(body).asJsonObject
-        val texture = root.getAsJsonObject("data")
-            ?.getAsJsonObject("texture")
-            ?: throw IllegalStateException("MineSkin response missing data.texture: $body")
-
-        val value = texture.getAsJsonPrimitive("value")?.asString
-            ?: throw IllegalStateException("MineSkin response missing value: $body")
-        val signature = texture.getAsJsonPrimitive("signature")?.asString
-        return ProfileSkinTextures(value = value, signature = signature)
-    }
 
     private fun requireValidSkin(skinUrl: String): ByteArray {
         val request = HttpRequest.newBuilder()

@@ -37,6 +37,7 @@ dependencies {
 
     testImplementation(platform(libs.junitBom))
     testImplementation(libs.junitJupiter)
+    testImplementation(libs.gson)
     testRuntimeOnly(libs.junitPlatformLauncher)
 }
 
