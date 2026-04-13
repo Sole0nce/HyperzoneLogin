@@ -32,31 +32,66 @@ object OfflineAuthBrigadierCommands {
     fun login(): HyperChatBrigadierRegistration {
         return HyperChatBrigadierRegistration { context ->
             context.literal()
-                .then(
-                    word("password")
-                        .executes { commandContext ->
-                            context.execute(
-                                commandContext.source,
-                                args = arrayOf(
-                                    StringArgumentType.getString(commandContext, "password")
-                                )
-                            )
-                        }
-                        .then(
-                            word("code")
-                                .executes { commandContext ->
-                                    context.execute(
-                                        commandContext.source,
-                                        args = arrayOf(
-                                            StringArgumentType.getString(commandContext, "password"),
-                                            StringArgumentType.getString(commandContext, "code")
-                                        )
-                                    )
-                                }
-                        )
-                )
+                .then(loginPassword(context))
+                .then(loginAs(context))
         }
     }
+
+    private fun loginPassword(context: HyperChatBrigadierContext) =
+        word("password")
+            .executes { commandContext ->
+                context.execute(
+                    commandContext.source,
+                    args = arrayOf(
+                        StringArgumentType.getString(commandContext, "password")
+                    )
+                )
+            }
+            .then(
+                word("code")
+                    .executes { commandContext ->
+                        context.execute(
+                            commandContext.source,
+                            args = arrayOf(
+                                StringArgumentType.getString(commandContext, "password"),
+                                StringArgumentType.getString(commandContext, "code")
+                            )
+                        )
+                    }
+            )
+
+    private fun loginAs(context: HyperChatBrigadierContext) =
+        BrigadierCommand.literalArgumentBuilder("as")
+            .then(
+                word("username")
+                    .then(
+                        word("password")
+                            .executes { commandContext ->
+                                context.execute(
+                                    commandContext.source,
+                                    args = arrayOf(
+                                        "as",
+                                        StringArgumentType.getString(commandContext, "username"),
+                                        StringArgumentType.getString(commandContext, "password")
+                                    )
+                                )
+                            }
+                            .then(
+                                word("code")
+                                    .executes { commandContext ->
+                                        context.execute(
+                                            commandContext.source,
+                                            args = arrayOf(
+                                                "as",
+                                                StringArgumentType.getString(commandContext, "username"),
+                                                StringArgumentType.getString(commandContext, "password"),
+                                                StringArgumentType.getString(commandContext, "code")
+                                            )
+                                        )
+                                    }
+                            )
+                    )
+            )
 
     fun register(): HyperChatBrigadierRegistration {
         return doublePasswordCommand("register", "password", "confirmPassword")

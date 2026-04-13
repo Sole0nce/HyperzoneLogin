@@ -197,7 +197,47 @@ class OfflineAuthServiceRegisterTest {
         val prompts = service.getJoinPrompts(player)
 
         assertTrue(prompts.contains(OfflineAuthMessages.REGISTER_REQUEST))
-        assertEquals(1, prompts.size)
+        assertTrue(prompts.contains(OfflineAuthMessages.LOGIN_OTHER_USERNAME_PROMPT))
+        assertEquals(2, prompts.size)
+    }
+
+    @Test
+    fun `login supports explicitly choosing another offline username`() {
+        insertProfile()
+        repository.create(
+            name = NORMALIZED_NAME,
+            passwordHash = hashPassword(VALID_PASSWORD),
+            hashFormat = "sha256",
+            profileId = PROFILE.id
+        )
+
+        every { hyperZonePlayer.isInWaitingArea() } returns true
+        every { hyperZonePlayer.clientOriginalName } returns OTHER_NAME
+
+        val result = service.loginAs(player, USERNAME, VALID_PASSWORD)
+
+        assertTrue(result.success)
+        assertEquals(OfflineAuthMessages.LOGIN_SUCCESS, result.message)
+        verify(exactly = 1) {
+            hyperZonePlayer.submitCredential(match {
+                it.channelId == "offline" &&
+                    it.credentialId == NORMALIZED_NAME &&
+                    it.getBoundProfileId() == PROFILE.id
+            })
+        }
+        verify(exactly = 1) { hyperZonePlayer.overVerify() }
+    }
+
+    @Test
+    fun `login without explicit username gives a hint when current connection name is unregistered`() {
+        every { hyperZonePlayer.isInWaitingArea() } returns true
+        every { hyperZonePlayer.clientOriginalName } returns OTHER_NAME
+        every { profileService.getAttachedProfile(hyperZonePlayer) } returns null
+
+        val result = service.login(player, VALID_PASSWORD)
+
+        assertFalse(result.success)
+        assertEquals(OfflineAuthMessages.loginCurrentNameNotRegistered(OTHER_NAME), result.message)
     }
 
     @Test
@@ -276,12 +316,19 @@ class OfflineAuthServiceRegisterTest {
     companion object {
         private const val USERNAME = "Alice"
         private const val NORMALIZED_NAME = "alice"
+        private const val OTHER_NAME = "GuestUser"
         private const val VALID_PASSWORD = "SecurePass123"
         private val PROFILE = Profile(
             id = UUID.fromString("11111111-1111-1111-1111-111111111111"),
             name = USERNAME,
             uuid = UUID.fromString("22222222-2222-2222-2222-222222222222")
         )
+
+        private fun hashPassword(password: String): String {
+            return java.security.MessageDigest.getInstance("SHA-256")
+                .digest(password.toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it) }
+        }
     }
 }
 

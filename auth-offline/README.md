@@ -36,6 +36,8 @@ Auth Offline 模块 (hzl-auth-offline)
 - /login <password>
 - /login <password> [code]
   - 用法：立即使用指定密码尝试登录（适用于已注册账号）；若账号启用了 TOTP，则必须额外提供验证码。
+- /login as <username> <password> [code]
+  - 用法：当当前连接名与目标离线账号名不一致时，显式指定要登录的离线用户名；若账号启用了 TOTP，则验证码放在最后一个参数。
 - /register <password>
   - 用法：为当前连接的玩家创建一个离线账号并自动登录；如果检测到玩家已通过其他渠道拥有档案，则会自动尝试把离线密码绑定到该档案。
 - /changepassword <old> <new>
@@ -69,7 +71,7 @@ Auth Offline 模块 (hzl-auth-offline)
 
 | 命令 | 说明 | 所需权限 |
 |------|------|----------|
-| /login | 登录本地账号 | 无（玩家可自用） |
+| /login | 登录本地账号；支持 `/login as <username> <password> [code]` 显式指定离线账号名 | 无（玩家可自用） |
 | /register | 注册本地账号并登录；必要时自动把离线密码绑定到已有档案 | 无（但会根据玩家状态限制） |
 | /changepassword | 修改密码 | 无（需提供旧密码） |
 | /logout | 注销会话 | 无 |
