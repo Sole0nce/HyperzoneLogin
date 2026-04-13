@@ -27,24 +27,34 @@ import java.util.UUID
 class FloodgateHyperZoneCredential(
     private val trustedName: String,
     private val trustedUuid: UUID,
-    private val knownProfileId: UUID
+    private val suggestedProfileCreateUuid: UUID?,
+    private var knownProfileId: UUID? = null
 ) : HyperZoneCredential {
     override val channelId: String = CHANNEL_ID
     override val credentialId: String = trustedUuid.toString()
 
-    override fun getBoundProfileId(): UUID {
+    override fun getBoundProfileId(): UUID? {
         return knownProfileId
     }
 
+    override fun getSuggestedProfileCreateUuid(): UUID? {
+        return suggestedProfileCreateUuid
+    }
+
     override fun validateBind(profileId: UUID): String? {
-        if (profileId != knownProfileId) {
+        if (knownProfileId != null && profileId != knownProfileId) {
             return "Floodgate 凭证 $trustedName($trustedUuid) 已绑定到其他 Profile: $knownProfileId"
         }
         return null
     }
 
     override fun bind(profileId: UUID): Boolean {
-        return profileId == knownProfileId
+        if (knownProfileId != null) {
+            return profileId == knownProfileId
+        }
+
+        knownProfileId = profileId
+        return true
     }
 
     fun matches(uuid: UUID): Boolean {

@@ -35,6 +35,7 @@ import icu.h2l.api.player.HyperZonePlayerAccessor
 // and will register themselves with the main plugin at runtime. Do not import them here.
 import icu.h2l.login.command.BindCodeCommandRegistrar
 import icu.h2l.login.command.HyperZoneLoginCommand
+import icu.h2l.login.command.RenameCommand
 import icu.h2l.login.database.BindingCodeRepository
 import icu.h2l.login.config.BackendServerConfig
 import icu.h2l.login.config.DatabaseSourceConfig
@@ -48,12 +49,13 @@ import icu.h2l.login.inject.network.VelocityNetworkModule
 import icu.h2l.login.vServer.backend.BackendAuthHoldListener
 import icu.h2l.login.vServer.limbo.LimboVServerAuth
 import icu.h2l.login.vServer.command.ExitVServerCommand
-import icu.h2l.login.listener.EventListener
+import icu.h2l.login.listener.ProfileLayerVerifyListener
 import icu.h2l.login.listener.PlayerAreaLifecycleListener
 import icu.h2l.login.manager.HyperChatCommandManagerImpl
 import icu.h2l.login.manager.HyperZonePlayerManager
 import icu.h2l.login.message.MessageKeys
 import icu.h2l.login.message.MessageService
+import icu.h2l.login.listener.LoginRenameListener
 import icu.h2l.login.module.EmbeddedModuleRegistry
 import icu.h2l.login.module.EmbeddedModuleSpec
 import icu.h2l.login.profile.ProfileBindingCodeService
@@ -185,6 +187,13 @@ class HyperZoneLoginMain(
                 executor = ExitVServerCommand()
             )
         )
+        chatCommandManager.register(
+            HyperChatCommandRegistration(
+                name = "rename",
+                executor = RenameCommand(),
+                brigadier = RenameCommand.brigadier()
+            )
+        )
         BindCodeCommandRegistrar.register(chatCommandManager, bindingCodeService)
 
 //        最后加载模块
@@ -197,7 +206,8 @@ class HyperZoneLoginMain(
         val hzlCommand = HyperZoneLoginCommand(bindingCodeService).createCommand()
         val hzlCommandMeta = proxy.commandManager.metaBuilder(hzlCommand).build()
         proxy.commandManager.register(hzlCommandMeta, hzlCommand)
-        proxy.eventManager.register(plugin, EventListener())
+        proxy.eventManager.register(plugin, ProfileLayerVerifyListener())
+        proxy.eventManager.register(plugin, LoginRenameListener())
         proxy.eventManager.register(plugin, PlayerAreaLifecycleListener)
         proxy.eventManager.register(plugin, HyperZonePlayerManager)
 

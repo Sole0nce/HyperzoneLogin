@@ -37,13 +37,6 @@ import java.util.concurrent.ConcurrentHashMap
 class DatabaseHelper(
     private val manager: DatabaseManager
 ) {
-    data class ProfileResolutionResult(
-        val profile: Profile? = null,
-        val created: Boolean = false,
-        val reason: String? = null
-    )
-
-
     private val profileTable = manager.getProfileTable()
 
     private val profileCacheById = ConcurrentHashMap<UUID, Profile>()
@@ -198,56 +191,27 @@ class DatabaseHelper(
         }
     }
 
-    fun resolveTrustedProfile(name: String, uuid: UUID): ProfileResolutionResult {
+    fun validateTrustedProfileCreate(name: String, uuid: UUID): String? {
         val existingByUuid = getProfileByUuid(uuid)
         val existingByName = getProfileByName(name)
 
         if (existingByUuid != null && existingByName != null && existingByUuid.id != existingByName.id) {
-            return ProfileResolutionResult(
-                reason = "名称 $name 已被其他 Profile 占用，且 UUID 已映射到 ${existingByUuid.id}"
-            )
+            return "名称 $name 已被其他 Profile 占用，且 UUID 已映射到 ${existingByUuid.id}"
         }
 
         if (existingByUuid != null) {
-            if (existingByUuid.name != name) {
-                val updated = updateProfileName(existingByUuid.id, name)
-                if (!updated) {
-                    return ProfileResolutionResult(reason = "更新 Profile 名称失败")
-                }
-            }
-            return ProfileResolutionResult(profile = getProfile(existingByUuid.id) ?: existingByUuid)
+            return "UUID $uuid 已映射到现有 Profile: ${existingByUuid.id}"
         }
 
         if (existingByName != null) {
             return if (existingByName.uuid == uuid) {
-                ProfileResolutionResult(profile = existingByName)
+                "名称 $name 已映射到现有 Profile: ${existingByName.id}"
             } else {
-                ProfileResolutionResult(reason = "名称 $name 已被其他 UUID 占用")
+                "名称 $name 已被其他 UUID 占用"
             }
         }
 
-        return ProfileResolutionResult()
-    }
-
-    fun resolveOrCreateTrustedProfile(name: String, uuid: UUID): ProfileResolutionResult {
-        val resolved = resolveTrustedProfile(name, uuid)
-        if (resolved.profile != null || resolved.reason != null) {
-            return resolved
-        }
-
-        repeat(3) {
-            val profileId = UUID.randomUUID()
-            if (!createProfile(profileId, name, uuid)) {
-                return@repeat
-            }
-
-            return ProfileResolutionResult(
-                profile = getProfile(profileId) ?: Profile(profileId, name, uuid),
-                created = true
-            )
-        }
-
-        return ProfileResolutionResult(reason = "创建 Profile 失败")
+        return null
     }
 
     /**

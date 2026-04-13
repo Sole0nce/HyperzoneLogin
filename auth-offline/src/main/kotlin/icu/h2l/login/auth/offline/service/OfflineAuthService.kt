@@ -56,7 +56,7 @@ class OfflineAuthService(
 
     fun register(player: Player, password: String): Result {
         val hyperZonePlayer = playerAccessor.getByPlayer(player)
-        val username = hyperZonePlayer.clientOriginalName
+        val username = hyperZonePlayer.registrationName
         val normalizedName = username.lowercase()
         if (repository.getByName(normalizedName) != null) {
             return Result(false, OfflineAuthMessages.OFFLINE_PASSWORD_ALREADY_SET)
@@ -71,9 +71,9 @@ class OfflineAuthService(
             return bindExistingProfile(player, hyperZonePlayer, attachedProfile, username, normalizedName, password)
         }
 
-        if (profileService.canResolveOrCreateProfile(username)) {
+        if (profileService.canCreate(username)) {
             val profile = try {
-                profileService.resolveOrCreateProfile(hyperZonePlayer, username)
+                profileService.create(username)
             } catch (throwable: IllegalStateException) {
                 return Result(false, componentFromThrowable(throwable, OfflineAuthMessages.REGISTER_FAILED))
             }
@@ -541,7 +541,8 @@ class OfflineAuthService(
         val prompts = ArrayList<Component>()
 
         if (entry == null) {
-            val normalizedName = hyperPlayer.clientOriginalName.lowercase()
+            val registrationName = hyperPlayer.registrationName
+            val normalizedName = registrationName.lowercase()
             val hasPendingOfflineRegistration = hyperPlayer.getSubmittedCredentials()
                 .asSequence()
                 .filterIsInstance<OfflineHyperZoneCredential>()
@@ -552,7 +553,7 @@ class OfflineAuthService(
             }
 
             prompts += OfflineAuthMessages.REGISTER_REQUEST
-            if (!profileService.canResolveOrCreateProfile(hyperPlayer.clientOriginalName)) {
+            if (!profileService.canCreate(registrationName)) {
                 prompts += OfflineAuthMessages.REGISTER_BIND_HINT
             }
             return prompts

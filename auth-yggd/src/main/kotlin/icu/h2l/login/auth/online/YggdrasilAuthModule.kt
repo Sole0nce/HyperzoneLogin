@@ -264,6 +264,7 @@ class YggdrasilAuthModule(
                     entryId = result.entryId,
                     authenticatedName = result.profile.name,
                     authenticatedUuid = result.profile.id,
+                    suggestedProfileCreateUuid = resolveProfileResolveUuid(result),
                     knownProfileId = existingBoundProfileId
                 )
             )
@@ -272,9 +273,9 @@ class YggdrasilAuthModule(
 
         val profileResolveUuid = resolveProfileResolveUuid(result)
 
-        if (profileService.canResolveOrCreateProfile(result.profile.name, profileResolveUuid)) {
-            val resolvedProfile = try {
-                profileService.resolveOrCreateProfile(handler, result.profile.name, profileResolveUuid)
+        if (profileService.canCreate(handler.registrationName, profileResolveUuid)) {
+            val createdProfile = try {
+                profileService.create(handler.registrationName, profileResolveUuid)
             } catch (throwable: IllegalStateException) {
                 return throwable.message ?: "创建 Profile 失败"
             }
@@ -283,7 +284,7 @@ class YggdrasilAuthModule(
                 entryId = result.entryId,
                 name = result.profile.name,
                 uuid = result.profile.id,
-                pid = resolvedProfile.id
+                pid = createdProfile.id
             )
             if (bound) {
                 handler.submitCredential(
@@ -291,7 +292,8 @@ class YggdrasilAuthModule(
                         entryId = result.entryId,
                         authenticatedName = result.profile.name,
                         authenticatedUuid = result.profile.id,
-                        knownProfileId = resolvedProfile.id
+                        suggestedProfileCreateUuid = profileResolveUuid,
+                        knownProfileId = createdProfile.id
                     )
                 )
                 return null
@@ -302,7 +304,8 @@ class YggdrasilAuthModule(
             yggdrasilCredential(
                 entryId = result.entryId,
                 authenticatedName = result.profile.name,
-                authenticatedUuid = result.profile.id
+                authenticatedUuid = result.profile.id,
+                suggestedProfileCreateUuid = profileResolveUuid
             )
         )
         return null
@@ -699,6 +702,7 @@ class YggdrasilAuthModule(
         entryId: String,
         authenticatedName: String,
         authenticatedUuid: UUID,
+        suggestedProfileCreateUuid: UUID?,
         knownProfileId: UUID? = null
     ): YggdrasilHyperZoneCredential {
         return YggdrasilHyperZoneCredential(
@@ -706,6 +710,7 @@ class YggdrasilAuthModule(
             entryId = entryId,
             authenticatedName = authenticatedName,
             authenticatedUUID = authenticatedUuid,
+            suggestedProfileCreateUuid = suggestedProfileCreateUuid,
             knownProfileId = knownProfileId
         )
     }

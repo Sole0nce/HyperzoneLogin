@@ -96,6 +96,7 @@ class OfflineAuthServiceRegisterTest {
         pendingRegistrations = PendingOfflineRegistrationManager()
 
         every { hyperZonePlayer.clientOriginalName } returns USERNAME
+        every { hyperZonePlayer.registrationName } returns USERNAME
         every { hyperZonePlayer.getSubmittedCredentials() } returns emptyList()
 
         service = OfflineAuthService(
@@ -114,8 +115,8 @@ class OfflineAuthServiceRegisterTest {
         insertProfile()
 
         every { profileService.getAttachedProfile(hyperZonePlayer) } returns null
-        every { profileService.canResolveOrCreateProfile(USERNAME, null) } returns true
-        every { profileService.resolveOrCreateProfile(hyperZonePlayer, USERNAME, null) } returns PROFILE
+        every { profileService.canCreate(USERNAME, null) } returns true
+        every { profileService.create(USERNAME, null) } returns PROFILE
 
         val result = service.register(player, VALID_PASSWORD)
         val saved = repository.getByName(NORMALIZED_NAME)
@@ -189,8 +190,9 @@ class OfflineAuthServiceRegisterTest {
         insertProfile()
 
         every { hyperZonePlayer.isInWaitingArea() } returns true
+        every { hyperZonePlayer.registrationName } returns USERNAME
         every { profileService.getAttachedProfile(hyperZonePlayer) } returns PROFILE
-        every { profileService.canResolveOrCreateProfile(USERNAME, null) } returns false
+        every { profileService.canCreate(USERNAME, null) } returns false
 
         val prompts = service.getJoinPrompts(player)
 
@@ -201,7 +203,7 @@ class OfflineAuthServiceRegisterTest {
     @Test
     fun `register falls back to unbound credential flow when profile name conflicts prevent direct creation`() {
         every { profileService.getAttachedProfile(hyperZonePlayer) } returns null
-        every { profileService.canResolveOrCreateProfile(USERNAME, null) } returns false
+        every { profileService.canCreate(USERNAME, null) } returns false
 
         val credentialSlot = slot<OfflineHyperZoneCredential>()
         every { hyperZonePlayer.submitCredential(capture(credentialSlot)) } just Runs
@@ -213,12 +215,12 @@ class OfflineAuthServiceRegisterTest {
         assertEquals(OfflineAuthMessages.REGISTER_BIND_PENDING, result.message)
         assertNull(savedBeforeBind)
         assertTrue(credentialSlot.isCaptured)
-        assertTrue(credentialSlot.captured.credentialId.startsWith("$NORMALIZED_NAME:"))
+        assertNotEquals(NORMALIZED_NAME, credentialSlot.captured.credentialId)
         assertEquals(null, credentialSlot.captured.getBoundProfileId())
         verify(exactly = 1) {
             hyperZonePlayer.submitCredential(match {
                 it.channelId == "offline" &&
-                    it.credentialId.startsWith("$NORMALIZED_NAME:") &&
+                    it.credentialId != NORMALIZED_NAME &&
                     it.getBoundProfileId() == null
             })
         }

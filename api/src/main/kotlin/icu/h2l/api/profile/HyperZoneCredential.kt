@@ -48,6 +48,23 @@ interface HyperZoneCredential {
     fun getBoundProfileId(): UUID?
 
     /**
+     * 当该凭证尚未绑定 Profile，但后续可能通过显式 create 流程建档时，
+     * 返回其建议使用的档案 UUID；返回 null 表示 create 阶段不应透传 UUID。
+     */
+    fun getSuggestedProfileCreateUuid(): UUID? {
+        return null
+    }
+
+    /**
+     * 登录等待阶段发生 `/rename` 时，允许凭证同步更新其内部待绑定状态。
+     *
+     * 该回调只用于“尚未完成绑定的当前会话临时状态”；
+     * 已落库的正式绑定关系不得因为 rename 被静默改写。
+     */
+    fun onRegistrationNameChanged(newRegistrationName: String) {
+    }
+
+    /**
      * 在真正写入绑定关系前做一次校验。
      *
      * 返回 null 表示允许绑定；否则返回拒绝原因。

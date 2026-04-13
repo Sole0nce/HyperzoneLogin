@@ -50,6 +50,12 @@ class PendingOfflineRegistrationManager {
         return registrations[credentialUuid]
     }
 
+    fun rename(credentialUuid: UUID, newNormalizedName: String): PendingOfflineRegistration? {
+        return registrations.computeIfPresent(credentialUuid) { _, current ->
+            current.copy(normalizedName = newNormalizedName)
+        }
+    }
+
     fun consume(credentialUuid: UUID): PendingOfflineRegistration? {
         return registrations.remove(credentialUuid)
     }

@@ -33,7 +33,7 @@ import icu.h2l.login.manager.HyperZonePlayerManager
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
 
-class EventListener {
+class ProfileLayerVerifyListener {
     companion object {
         const val EXPECTED_NAME_PREFIX = RemapUtils.EXPECTED_NAME_PREFIX
         const val REMAP_PREFIX = RemapUtils.REMAP_PREFIX

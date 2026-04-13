@@ -30,6 +30,7 @@ class YggdrasilHyperZoneCredential(
     private val entryId: String,
     private val authenticatedName: String,
     private val authenticatedUUID: UUID,
+    private val suggestedProfileCreateUuid: UUID?,
     private val knownProfileId: UUID? = null
 ) : HyperZoneCredential {
     override val channelId: String = CHANNEL_ID
@@ -37,6 +38,10 @@ class YggdrasilHyperZoneCredential(
 
     override fun getBoundProfileId(): UUID? {
         return knownProfileId ?: entryDatabaseHelper.findEntryByUuid(entryId, authenticatedUUID)
+    }
+
+    override fun getSuggestedProfileCreateUuid(): UUID? {
+        return suggestedProfileCreateUuid
     }
 
     override fun validateBind(profileId: UUID): String? {

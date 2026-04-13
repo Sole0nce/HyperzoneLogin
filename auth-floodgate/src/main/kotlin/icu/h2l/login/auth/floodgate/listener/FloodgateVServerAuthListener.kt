@@ -39,7 +39,13 @@ class FloodgateVServerAuthListener(
             return
         }
         if (!result.passed) {
-            event.proxyPlayer.disconnect(Component.text(result.userMessage ?: "Floodgate 登录失败。", NamedTextColor.RED))
+            if (result.disconnectOnFailure) {
+                event.proxyPlayer.disconnect(Component.text(result.userMessage ?: "Floodgate 登录失败。", NamedTextColor.RED))
+            } else {
+                result.userMessage?.let {
+                    event.hyperZonePlayer.sendMessage(Component.text(it, NamedTextColor.YELLOW))
+                }
+            }
             return
         }
         event.pass = true

@@ -25,12 +25,6 @@ import icu.h2l.api.db.Profile
 import icu.h2l.api.player.HyperZonePlayer
 import java.util.UUID
 
-data class HyperZoneProfileResolveResult(
-    val profile: Profile? = null,
-    val created: Boolean = false,
-    val reason: String? = null
-)
-
 /**
  * 核心层 Profile 访问入口。
  *
@@ -40,6 +34,19 @@ data class HyperZoneProfileResolveResult(
 interface HyperZoneProfileService {
     fun getProfile(profileId: UUID): Profile?
 
+    /**
+     * 登录流程中的“resolve”语义必须明确等价于“按既有 profileId 解析已有档案”，
+     * 严禁再把“可能创建新档案”混入 resolve 语义。
+     */
+    fun canResolve(profileId: UUID): Boolean {
+        return getProfile(profileId) != null
+    }
+
+    fun resolve(profileId: UUID): Profile {
+        return getProfile(profileId)
+            ?: throw IllegalStateException("未找到 Profile: $profileId")
+    }
+
     fun getAttachedProfile(player: HyperZonePlayer): Profile?
 
     fun attachProfile(player: HyperZonePlayer, profileId: UUID): Profile?
@@ -48,11 +55,13 @@ interface HyperZoneProfileService {
         return getAttachedProfile(player) != null
     }
 
-    fun canResolveOrCreateProfile(userName: String, uuid: UUID? = null): Boolean
+    /**
+     * 登录流程中的“create”语义必须明确等价于“以指定注册名尝试新建档案”，
+     * 严禁在 create 内夹带 resolve / rename / 回退匹配等不相干流程。
+     */
+    fun canCreate(userName: String, uuid: UUID? = null): Boolean
 
-    fun tryResolveOrCreateProfile(userName: String, uuid: UUID? = null): HyperZoneProfileResolveResult
-
-    fun resolveOrCreateProfile(player: HyperZonePlayer, userName: String? = null, uuid: UUID? = null): Profile
+    fun create(userName: String, uuid: UUID? = null): Profile
 
     fun attachVerifiedCredentialProfile(player: HyperZonePlayer): Profile?
 

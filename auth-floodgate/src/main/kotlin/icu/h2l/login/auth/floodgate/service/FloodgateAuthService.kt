@@ -49,6 +49,7 @@ class FloodgateAuthService(
     data class CompleteResult(
         val handled: Boolean,
         val passed: Boolean,
+        val disconnectOnFailure: Boolean = false,
         val userMessage: String? = null
     )
 
@@ -103,19 +104,30 @@ class FloodgateAuthService(
 
         return try {
             if (session != null && findCredential(hyperZonePlayer, session.userUUID) == null) {
+                val suggestedProfileCreateUuid = resolveProfileUuid(session.userUUID)
                 val knownProfileId = profileService.getAttachedProfile(hyperZonePlayer)?.id
-                    ?: profileService.resolveOrCreateProfile(
-                        hyperZonePlayer,
-                        session.userName,
-                        resolveProfileUuid(session.userUUID)
-                    ).id
+                    ?: if (profileService.canCreate(hyperZonePlayer.registrationName, suggestedProfileCreateUuid)) {
+                        profileService.create(hyperZonePlayer.registrationName, suggestedProfileCreateUuid).id
+                    } else {
+                        null
+                    }
                 hyperZonePlayer.submitCredential(
                     FloodgateHyperZoneCredential(
                         trustedName = session.userName,
                         trustedUuid = session.userUUID,
+                        suggestedProfileCreateUuid = suggestedProfileCreateUuid,
                         knownProfileId = knownProfileId
                     )
                 )
+
+                if (knownProfileId == null) {
+                    return CompleteResult(
+                        handled = true,
+                        passed = false,
+                        disconnectOnFailure = false,
+                        userMessage = "Floodgate 已完成可信认证，但当前注册名无法创建 Profile。请使用 /rename <新注册名> 或 /bindcode use <绑定码>。"
+                    )
+                }
             }
             hyperZonePlayer.overVerify()
             sessionHolder.remove(channel)
@@ -125,6 +137,7 @@ class FloodgateAuthService(
             CompleteResult(
                 handled = true,
                 passed = false,
+                disconnectOnFailure = true,
                 userMessage = "Floodgate 登录失败：认证完成阶段出错。"
             )
         }

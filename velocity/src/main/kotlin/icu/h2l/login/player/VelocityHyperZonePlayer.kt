@@ -64,6 +64,7 @@ class VelocityHyperZonePlayer(
 
     private var proxyPlayer: Player? = null
     private val hasBoundProxyPlayer = AtomicBoolean(false)
+    private val registrationNameState = AtomicReference(clientOriginalName)
 
     /**
      * 认证链路状态，仅表示子模块是否认可本次登录。
@@ -125,6 +126,12 @@ class VelocityHyperZonePlayer(
     override fun hasAttachedProfile(): Boolean {
         return HyperZoneLoginMain.getInstance().profileService.hasAttachedProfile(this)
     }
+
+    override var registrationName: String
+        get() = registrationNameState.get()
+        set(value) {
+            registrationNameState.set(value)
+        }
 
     override fun submitCredential(credential: HyperZoneCredential) {
         submittedCredentials.removeIf {

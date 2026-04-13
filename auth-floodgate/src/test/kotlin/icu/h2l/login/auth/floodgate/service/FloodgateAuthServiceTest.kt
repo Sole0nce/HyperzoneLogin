@@ -179,13 +179,15 @@ class FloodgateAuthServiceTest {
         every { playerAccessor.create(channel, "BedrockUser", userUuid, any()) } returns hyperPlayer
         every { hyperPlayer.setTemporaryGameProfile(any()) } just runs
         every { hyperPlayer.clientOriginalName } returns "BedrockUser"
+        every { hyperPlayer.registrationName } returns "BedrockUser"
         every { hyperPlayer.getSubmittedCredentials() } answers { submittedCredentials.toList() }
         every { hyperPlayer.submitCredential(any()) } answers {
             submittedCredentials += firstArg<HyperZoneCredential>()
         }
         every { hyperPlayer.overVerify() } just runs
         every { profileService.getAttachedProfile(hyperPlayer) } returns null
-        every { profileService.resolveOrCreateProfile(hyperPlayer, "BedrockUser", userUuid) } returns resolvedProfile
+        every { profileService.canCreate("BedrockUser", userUuid) } returns true
+        every { profileService.create("BedrockUser", userUuid) } returns resolvedProfile
 
         val acceptResult = service.acceptInitialProfile(channel, ".BedrockUser", userUuid)
 
@@ -201,7 +203,8 @@ class FloodgateAuthServiceTest {
         assertEquals(profileId, credential.getBoundProfileId())
         assertTrue(credential.matches(userUuid))
         verify(exactly = 1) { hyperPlayer.overVerify() }
-        verify(exactly = 1) { profileService.resolveOrCreateProfile(hyperPlayer, "BedrockUser", userUuid) }
+        verify(exactly = 1) { profileService.canCreate("BedrockUser", userUuid) }
+        verify(exactly = 1) { profileService.create("BedrockUser", userUuid) }
     }
 
     @Test
@@ -225,13 +228,15 @@ class FloodgateAuthServiceTest {
         every { playerAccessor.create(channel, "BedrockUser", userUuid, any()) } returns hyperPlayer
         every { hyperPlayer.setTemporaryGameProfile(any()) } just runs
         every { hyperPlayer.clientOriginalName } returns "BedrockUser"
+        every { hyperPlayer.registrationName } returns "BedrockUser"
         every { hyperPlayer.getSubmittedCredentials() } answers { submittedCredentials.toList() }
         every { hyperPlayer.submitCredential(any()) } answers {
             submittedCredentials += firstArg<HyperZoneCredential>()
         }
         every { hyperPlayer.overVerify() } just runs
         every { profileService.getAttachedProfile(hyperPlayer) } returns null
-        every { profileService.resolveOrCreateProfile(hyperPlayer, "BedrockUser", null) } returns resolvedProfile
+        every { profileService.canCreate("BedrockUser", null) } returns true
+        every { profileService.create("BedrockUser", null) } returns resolvedProfile
 
         val acceptResult = disabledService.acceptInitialProfile(channel, ".BedrockUser", userUuid)
 
@@ -240,8 +245,9 @@ class FloodgateAuthServiceTest {
         assertSame(FloodgateAuthService.VerifyResult.Accepted, acceptResult)
         assertTrue(result.handled)
         assertTrue(result.passed)
-        verify(exactly = 1) { profileService.resolveOrCreateProfile(hyperPlayer, "BedrockUser", null) }
-        verify(exactly = 0) { profileService.resolveOrCreateProfile(hyperPlayer, "BedrockUser", userUuid) }
+        verify(exactly = 1) { profileService.canCreate("BedrockUser", null) }
+        verify(exactly = 1) { profileService.create("BedrockUser", null) }
+        verify(exactly = 0) { profileService.create("BedrockUser", userUuid) }
     }
 
     @Test

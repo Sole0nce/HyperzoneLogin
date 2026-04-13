@@ -19,17 +19,17 @@
  *
  */
 
-package icu.h2l.login.auth.floodgate.config
+package icu.h2l.api.event.auth
 
-import org.spongepowered.configurate.objectmapping.ConfigSerializable
-import org.spongepowered.configurate.objectmapping.meta.Comment
+import icu.h2l.api.player.HyperZonePlayer
 
-@ConfigSerializable
-class FloodgateAuthConfig {
-    @Comment("是否自动去除 Floodgate API 当前返回的玩家名前缀")
-    var stripUsernamePrefix: Boolean = true
-
-    @Comment("是否在 canCreate / create 这类显式建档流程中透传 Floodgate 原始 UUID；关闭后改传 null")
-    var passFloodgateUuidToProfileResolve: Boolean = true
-}
+/**
+ * 等待区中的登录会话主动修改“建档注册名”后触发。
+ *
+ * 事件只携带当前事件发起者本身；
+ * 各监听器必须仅处理该玩家当前会话，不得影响其他等待区玩家。
+ */
+class LoginRenameEvent(
+    val hyperZonePlayer: HyperZonePlayer
+)
 

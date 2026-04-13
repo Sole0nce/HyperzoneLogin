@@ -24,7 +24,6 @@ package icu.h2l.login.profile
 import icu.h2l.api.db.Profile
 import icu.h2l.api.event.profile.ProfileAttachedEvent
 import icu.h2l.api.player.HyperZonePlayer
-import icu.h2l.api.profile.HyperZoneProfileResolveResult
 import icu.h2l.api.profile.HyperZoneProfileService
 import icu.h2l.api.util.RemapUtils
 import icu.h2l.login.HyperZoneLoginMain
@@ -51,29 +50,35 @@ class VelocityHyperZoneProfileService(
         return attachedProfiles[player]
     }
 
-    override fun canResolveOrCreateProfile(userName: String, uuid: UUID?): Boolean {
-        val resolvedUuid = resolveRequestedUuid(userName, uuid)
-        val resolved = databaseHelper.resolveTrustedProfile(userName, resolvedUuid)
-        return resolved.reason == null
+    override fun canResolve(profileId: UUID): Boolean {
+        return databaseHelper.getProfile(profileId) != null
     }
 
-    override fun tryResolveOrCreateProfile(userName: String, uuid: UUID?): HyperZoneProfileResolveResult {
+    override fun resolve(profileId: UUID): Profile {
+        return databaseHelper.getProfile(profileId)
+            ?: throw IllegalStateException("未找到 Profile: $profileId")
+    }
+
+    override fun canCreate(userName: String, uuid: UUID?): Boolean {
+        return getCreateBlockedReason(userName, uuid) == null
+    }
+
+    override fun create(userName: String, uuid: UUID?): Profile {
         val resolvedUuid = resolveRequestedUuid(userName, uuid)
-        val resolved = databaseHelper.resolveOrCreateTrustedProfile(userName, resolvedUuid)
-        return HyperZoneProfileResolveResult(
-            profile = resolved.profile,
-            created = resolved.created,
-            reason = resolved.reason
+        getCreateBlockedReason(userName, resolvedUuid)?.let { reason ->
+            throw IllegalStateException(reason)
+        }
+
+        repeat(3) {
+            val profileId = UUID.randomUUID()
+            if (databaseHelper.createProfile(profileId, userName, resolvedUuid)) {
+                return databaseHelper.getProfile(profileId) ?: Profile(profileId, userName, resolvedUuid)
+            }
+        }
+
+        throw IllegalStateException(
+            getCreateBlockedReason(userName, resolvedUuid) ?: "玩家 $userName 注册失败，未能创建 Profile"
         )
-    }
-
-    override fun resolveOrCreateProfile(player: HyperZonePlayer, userName: String?, uuid: UUID?): Profile {
-        getAttachedProfile(player)?.let { return it }
-
-        val resolvedName = userName ?: player.clientOriginalName
-        val resolved = tryResolveOrCreateProfile(resolvedName, uuid)
-        return resolved.profile
-            ?: throw IllegalStateException(resolved.reason ?: "玩家 $resolvedName 注册失败，未能解析 Profile")
     }
 
     override fun attachProfile(player: HyperZonePlayer, profileId: UUID): Profile? {
@@ -118,6 +123,11 @@ class VelocityHyperZoneProfileService(
 
     fun clear(player: HyperZonePlayer) {
         attachedProfiles.remove(player)
+    }
+
+    fun getCreateBlockedReason(userName: String, uuid: UUID? = null): String? {
+        val resolvedUuid = resolveRequestedUuid(userName, uuid)
+        return databaseHelper.validateTrustedProfileCreate(userName, resolvedUuid)
     }
 
     override fun bindSubmittedCredentials(player: HyperZonePlayer, profileId: UUID): Profile {

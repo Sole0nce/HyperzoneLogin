@@ -157,9 +157,10 @@ class HyperZoneLoginCommand(
                 HyperZoneMessagePlaceholder.text("verified", hyperZonePlayer.isVerified()),
                 HyperZoneMessagePlaceholder.text("attached_profile", hyperZonePlayer.hasAttachedProfile()),
                 HyperZoneMessagePlaceholder.text("waiting_area", hyperZonePlayer.isInWaitingArea()),
+                    HyperZoneMessagePlaceholder.text("registration_name", hyperZonePlayer.registrationName),
                 HyperZoneMessagePlaceholder.text(
-                    "can_resolve_or_create_profile",
-                    profileService.canResolveOrCreateProfile(hyperZonePlayer.clientOriginalName)
+                        "can_create_profile",
+                        profileService.canCreate(hyperZonePlayer.registrationName)
                 ),
                 HyperZoneMessagePlaceholder.text("credentials", hyperZonePlayer.getSubmittedCredentials().size)
             )

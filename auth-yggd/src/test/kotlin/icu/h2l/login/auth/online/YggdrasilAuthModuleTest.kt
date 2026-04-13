@@ -111,14 +111,14 @@ class YggdrasilAuthModuleTest {
                 ResolveRequest("EnabledUser", enabledUuid),
                 ResolveRequest("DisabledUser", null)
             ),
-            profileService.canResolveCalls
+            profileService.canCreateCalls
         )
         assertEquals(
             listOf(
                 ResolveRequest("EnabledUser", enabledUuid),
                 ResolveRequest("DisabledUser", null)
             ),
-            profileService.resolveCalls
+            profileService.createCalls
         )
     }
 
@@ -137,8 +137,8 @@ class YggdrasilAuthModuleTest {
         )
 
         assertNull(error)
-        assertEquals(listOf(ResolveRequest("FallbackUser", authenticatedUuid)), profileService.canResolveCalls)
-        assertEquals(listOf(ResolveRequest("FallbackUser", authenticatedUuid)), profileService.resolveCalls)
+        assertEquals(listOf(ResolveRequest("FallbackUser", authenticatedUuid)), profileService.canCreateCalls)
+        assertEquals(listOf(ResolveRequest("FallbackUser", authenticatedUuid)), profileService.createCalls)
     }
 
     private fun invokeEnsureCredential(
@@ -206,8 +206,8 @@ class YggdrasilAuthModuleTest {
 
     private class RecordingProfileService : HyperZoneProfileService {
         private val allowedResolutions = mutableMapOf<ResolveRequest, Profile>()
-        val canResolveCalls = mutableListOf<ResolveRequest>()
-        val resolveCalls = mutableListOf<ResolveRequest>()
+        val canCreateCalls = mutableListOf<ResolveRequest>()
+        val createCalls = mutableListOf<ResolveRequest>()
 
         fun allowResolve(userName: String, uuid: UUID?, profile: Profile) {
             allowedResolutions[ResolveRequest(userName, uuid)] = profile
@@ -219,19 +219,15 @@ class YggdrasilAuthModuleTest {
 
         override fun attachProfile(player: HyperZonePlayer, profileId: UUID): Profile? = null
 
-        override fun canResolveOrCreateProfile(userName: String, uuid: UUID?): Boolean {
+        override fun canCreate(userName: String, uuid: UUID?): Boolean {
             val request = ResolveRequest(userName, uuid)
-            canResolveCalls += request
+            canCreateCalls += request
             return allowedResolutions.containsKey(request)
         }
 
-        override fun tryResolveOrCreateProfile(userName: String, uuid: UUID?) =
-            throw UnsupportedOperationException("Not used in this test")
-
-        override fun resolveOrCreateProfile(player: HyperZonePlayer, userName: String?, uuid: UUID?): Profile {
-            val resolvedName = userName ?: player.clientOriginalName
-            val request = ResolveRequest(resolvedName, uuid)
-            resolveCalls += request
+        override fun create(userName: String, uuid: UUID?): Profile {
+            val request = ResolveRequest(userName, uuid)
+            createCalls += request
             return allowedResolutions[request]
                 ?: throw IllegalStateException("Unexpected resolve request: $request")
         }
@@ -249,6 +245,7 @@ class YggdrasilAuthModuleTest {
     ) : HyperZonePlayer {
         private val submittedCredentials = mutableListOf<HyperZoneCredential>()
         private var temporaryProfile: GameProfile = GameProfile(UUID.randomUUID(), "temp", emptyList())
+        override var registrationName: String = clientOriginalName
 
         override val isOnlinePlayer: Boolean = false
 

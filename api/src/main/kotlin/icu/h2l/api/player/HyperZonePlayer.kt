@@ -57,6 +57,16 @@ interface HyperZonePlayer {
     val clientOriginalUUID: UUID
 
     /**
+     * 当前登录会话用于“创建新 Profile / 初次注册”的候选名称。
+     *
+     * 该值与 [clientOriginalName] 严格区分：
+     * - `clientOriginalName` 始终保留客户端最初上报值，绝不改写；
+     * - `registrationName` 仅表示当前等待区会话后续若要建档时应使用的注册名，
+     *   可在名称冲突等待阶段通过 `/rename` 明确修改。
+     */
+    var registrationName: String
+
+    /**
      * 当前连接在预登录阶段最终判定出的在线模式。
      *
      * 该值只在第一次创建登录期玩家对象时确定，之后只允许读取，不允许修改。

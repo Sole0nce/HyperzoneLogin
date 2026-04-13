@@ -43,7 +43,7 @@ class EntryConfig {
         )
         var url: String = ""
 
-        @Comment("是否在 canResolveOrCreateProfile / resolveOrCreateProfile 时透传该 Entry 返回的原始 UUID；关闭后改传 null")
+        @Comment("是否在 canCreate / create 这类显式建档流程中透传该 Entry 返回的原始 UUID；关闭后改传 null")
         var passYggdrasilUuidToProfileResolve: Boolean = true
 
         @Comment("验证请求超时时间（毫秒）")
