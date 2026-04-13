@@ -19,7 +19,7 @@
  *
  */
 
-package icu.h2l.login.inject.network.netty
+package icu.h2l.login.inject.network.netty.replacer
 
 import com.velocitypowered.api.network.HandshakeIntent
 import com.velocitypowered.api.network.ProtocolVersion
@@ -46,7 +46,6 @@ import icu.h2l.login.HyperZoneLoginMain
 import icu.h2l.login.inject.network.ChatSessionUpdatePacketIdResolver
 import icu.h2l.login.manager.HyperZonePlayerManager
 import icu.h2l.login.player.ProfileSkinApplySupport
-import icu.h2l.login.player.VelocityHyperZonePlayer
 import io.netty.buffer.ByteBuf
 import io.netty.channel.Channel
 import io.netty.channel.ChannelHandlerContext
@@ -98,10 +97,10 @@ class ToBackendPacketReplacer(
             }
             return msg
         }
-
-        if (msg is HandshakePacket) {
-            return genHandshake()
-        }
+//目前生产的内容基本一致，没有必要替换
+//        if (msg is HandshakePacket) {
+//            return genHandshake()
+//        }
         if (msg is ServerLoginPacket) {
             val forwarded = genServerLogin()
             return forwarded

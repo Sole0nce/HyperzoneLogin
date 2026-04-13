@@ -19,7 +19,7 @@
  *
  */
 
-package icu.h2l.login.inject.network.netty
+package icu.h2l.login.inject.network.netty.replacer
 
 import com.velocitypowered.proxy.protocol.packet.ServerLoginSuccessPacket
 import icu.h2l.api.log.debug

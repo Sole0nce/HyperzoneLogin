@@ -34,14 +34,15 @@ class VelocityNetworkModule : HyperSubModule {
         val connectionManager = VelocityServer::class.java.getDeclaredField("cm").also {
             it.isAccessible = true
         }.get(proxy) as ConnectionManager
-
         val injector = VelocityNetworkInjectorImpl(connectionManager, proxy)
 
+//        发送到玩家方向
         proxy.eventManager.register(
             api,
             NetworkInjectListener(injector),
         )
 
+//        发送到服务器方向
         injector.injectToBackend()
     }
 }
