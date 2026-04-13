@@ -116,14 +116,15 @@ object PlayerAreaLifecycleListener {
     fun onServerConnected(event: ServerConnectedEvent) {
         val player = event.player
         val hyperZonePlayer = HyperZonePlayerManager.getByPlayerOrNull(player) ?: return
+        val adapterWaiting = HyperZoneLoginMain.getInstance().serverAdapter?.isPlayerInWaitingArea(player) == true
+        val logicalWaiting = hyperZonePlayer.isInWaitingArea() || adapterWaiting
 
-        if (hyperZonePlayer.isInWaitingArea()) {
+        if (logicalWaiting) {
             return
         }
 
         val channel = player.getChannel()
         val currentState = sessionStates[channel]
-        val logicalWaiting = hyperZonePlayer.isInWaitingArea()
 
         if (currentState?.currentArea == AreaState.WAITING) {
             val waitingLeaveReason = currentState.pendingWaitingLeaveReason

@@ -57,7 +57,9 @@ class BackendAuthHoldListener(
      *
      * 这里同时保存：
      * 1. 当前是否仍处于 auth hold；
-     * 2. 进入等待区前（或认证期间最新记住）的返回目标服。
+     * 2. 是否已经至少成功到达过一次后端等待服；
+     * 3. 进入等待区前（或认证期间最新记住）的返回目标服；
+     * 4. 若 `overVerify()` 过早触发，是否要在第一次进入等待服后再补执行离开流程。
      *
      * `returnTargetServerName` 不能在 `onVerified()` 时直接丢掉，
      * 因为玩家完成认证后仍可能再次停留/回到等待区服，此时 `/exit` 应优先把玩家送回
@@ -67,6 +69,8 @@ class BackendAuthHoldListener(
         var authServerName: String,
         var returnTargetServerName: String? = null,
         var inAuthHold: Boolean = true,
+        var hasConnectedToAuthServerOnce: Boolean = false,
+        var verifiedExitPending: Boolean = false,
     )
 
     private val logger
@@ -92,12 +96,10 @@ class BackendAuthHoldListener(
         val preferredTarget = currentServerName
             ?.takeUnless { it.equals(authServer.serverInfo.name, ignoreCase = true) }
 
-        if (!startAuthHold(player, hyperPlayer, authServer, preferredTarget)) {
-            return
-        }
+        startAuthHold(player, hyperPlayer, authServer, preferredTarget)
 
         if (currentServerName.equals(authServer.serverInfo.name, ignoreCase = true)) {
-            fireJoin(player, hyperPlayer)
+            onAuthServerJoined(player, hyperPlayer)
             return
         }
 
@@ -131,7 +133,9 @@ class BackendAuthHoldListener(
     }
 
     override fun isPlayerInWaitingArea(player: Player): Boolean {
-        return isOnBackendAuthServer(player)
+        val state = backendHoldStates[player.getChannel()]
+        return isOnBackendAuthServer(player, state?.authServerName ?: configuredAuthServerName()) ||
+            (state?.hasConnectedToAuthServerOnce == false)
     }
 
     @Subscribe
@@ -161,9 +165,7 @@ class BackendAuthHoldListener(
             .orElse(null)
             ?.takeUnless { it.equals(authServer.serverInfo.name, ignoreCase = true) }
 
-        if (!startAuthHold(player, hyperPlayer, authServer, targetServerName)) {
-            return
-        }
+        startAuthHold(player, hyperPlayer, authServer, targetServerName)
 
         hyperPlayer.suspendMessageDelivery()
         event.setInitialServer(authServer)
@@ -173,9 +175,8 @@ class BackendAuthHoldListener(
     fun onServerPreConnect(event: ServerPreConnectEvent) {
         val player = event.player
         val messages = HyperZoneLoginMain.getInstance().messageService
-        val hyperPlayer = getHyperPlayer(player) ?: return
-
-        if (!isInBackendAuthHold(player, hyperPlayer)) return
+        val state = backendHoldStates[player.getChannel()] ?: return
+        if (!needsAuthServerProtection(state)) return
 
         val authServer = resolveAuthServer() ?: run {
             player.disconnect(messages.render(player, MessageKeys.BackendAuth.UNAVAILABLE_DISCONNECT))
@@ -205,8 +206,10 @@ class BackendAuthHoldListener(
     fun onServerConnected(event: ServerConnectedEvent) {
         val player = event.player
         val hyperPlayer = getHyperPlayer(player) ?: return
-        if (!event.server.serverInfo.name.equals(configuredAuthServerName(), ignoreCase = true)) return
-        fireJoin(player, hyperPlayer)
+        val state = backendHoldStates[player.getChannel()]
+        val authServerName = state?.authServerName ?: configuredAuthServerName()
+        if (!event.server.serverInfo.name.equals(authServerName, ignoreCase = true)) return
+        onAuthServerJoined(player, hyperPlayer)
     }
 
     @Subscribe
@@ -219,17 +222,16 @@ class BackendAuthHoldListener(
         hyperPlayer: VelocityHyperZonePlayer,
         authServer: RegisteredServer,
         targetServerName: String?
-    ): Boolean {
+    ) {
         val resolvedTarget = resolvePostAuthTarget(player, authServer, targetServerName)
-        beginBackendAuthHold(player, authServer.serverInfo.name, resolvedTarget)
+        val state = beginBackendAuthHold(player, authServer.serverInfo.name, resolvedTarget)
 
         val authStartEvent = VServerAuthStartEvent(player, hyperPlayer)
         server.eventManager.fire(authStartEvent).join()
-        if (authStartEvent.pass) {
-            clearBackendAuthHold(player)
-            return false
+        if (authStartEvent.pass && state.inAuthHold) {
+            state.inAuthHold = false
+            state.verifiedExitPending = true
         }
-        return true
     }
 
     private fun resolvePostAuthTarget(
@@ -282,6 +284,20 @@ class BackendAuthHoldListener(
         this.server.eventManager.fire(VServerJoinEvent(player, hyperPlayer))
     }
 
+    private fun onAuthServerJoined(
+        player: Player,
+        hyperPlayer: VelocityHyperZonePlayer,
+    ) {
+        val state = backendHoldStates[player.getChannel()]
+        state?.hasConnectedToAuthServerOnce = true
+        fireJoin(player, hyperPlayer)
+
+        if (state?.verifiedExitPending == true) {
+            state.verifiedExitPending = false
+            connectVerifiedPlayerToTarget(player, state)
+        }
+    }
+
     override fun supportsProxyFallbackCommands(): Boolean {
         return true
     }
@@ -331,15 +347,12 @@ class BackendAuthHoldListener(
         val state = backendHoldStates[player.getChannel()] ?: return
         state.inAuthHold = false
 
-        connectPlayerToTarget(
-            player = player,
-            targetServerName = state.returnTargetServerName,
-            authServerName = state.authServerName,
-            missingTargetKey = MessageKeys.BackendAuth.VERIFIED_NO_TARGET,
-            missingServerKey = MessageKeys.BackendAuth.VERIFIED_SERVER_MISSING,
-            failureExceptionKey = MessageKeys.BackendAuth.VERIFIED_FAILURE_EXCEPTION,
-            failureReasonKey = MessageKeys.BackendAuth.VERIFIED_FAILURE_REASON
-        )
+        if (!state.hasConnectedToAuthServerOnce) {
+            state.verifiedExitPending = true
+            return
+        }
+
+        connectVerifiedPlayerToTarget(player, state)
     }
 
     private fun getHyperPlayer(player: Player): VelocityHyperZonePlayer? {
@@ -356,20 +369,39 @@ class BackendAuthHoldListener(
         return HyperZoneLoginMain.getBackendServerConfig().rememberRequestedServerDuringAuth
     }
 
-    private fun beginBackendAuthHold(player: Player, authServerName: String, targetServerName: String?) {
+    private fun beginBackendAuthHold(player: Player, authServerName: String, targetServerName: String?): BackendHoldState {
         val channel = player.getChannel()
         val rememberedTarget = targetServerName?.takeUnless { it.isBlank() }
             ?: backendHoldStates[channel]?.returnTargetServerName
 
-        backendHoldStates[channel] = BackendHoldState(
+        return BackendHoldState(
             authServerName = authServerName,
             returnTargetServerName = rememberedTarget,
             inAuthHold = true,
-        )
+            hasConnectedToAuthServerOnce = false,
+            verifiedExitPending = false,
+        ).also {
+            backendHoldStates[channel] = it
+        }
     }
 
-    private fun isInBackendAuthHold(player: Player, hyperZonePlayer: VelocityHyperZonePlayer): Boolean {
-        return hyperZonePlayer.isInWaitingArea() && (backendHoldStates[player.getChannel()]?.inAuthHold == true)
+    private fun needsAuthServerProtection(state: BackendHoldState): Boolean {
+        return state.inAuthHold || !state.hasConnectedToAuthServerOnce
+    }
+
+    private fun connectVerifiedPlayerToTarget(
+        player: Player,
+        state: BackendHoldState,
+    ): Boolean {
+        return connectPlayerToTarget(
+            player = player,
+            targetServerName = state.returnTargetServerName,
+            authServerName = state.authServerName,
+            missingTargetKey = MessageKeys.BackendAuth.VERIFIED_NO_TARGET,
+            missingServerKey = MessageKeys.BackendAuth.VERIFIED_SERVER_MISSING,
+            failureExceptionKey = MessageKeys.BackendAuth.VERIFIED_FAILURE_EXCEPTION,
+            failureReasonKey = MessageKeys.BackendAuth.VERIFIED_FAILURE_REASON,
+        )
     }
 
     private fun rememberPostAuthTarget(player: Player, serverName: String?) {
@@ -380,12 +412,7 @@ class BackendAuthHoldListener(
         }
     }
 
-    private fun clearBackendAuthHold(player: Player) {
-        backendHoldStates.remove(player.getChannel())
-    }
-
-    private fun isOnBackendAuthServer(player: Player): Boolean {
-        val authServerName = configuredAuthServerName()
+    private fun isOnBackendAuthServer(player: Player, authServerName: String = configuredAuthServerName()): Boolean {
         if (authServerName.isBlank()) {
             return false
         }
