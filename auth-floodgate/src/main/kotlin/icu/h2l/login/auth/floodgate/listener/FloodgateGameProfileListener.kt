@@ -19,23 +19,20 @@
  *
  */
 
-pluginManagement {
-    repositories {
-        maven("https://maven.aliyun.com/repository/central")
-        maven("https://mirrors.cloud.tencent.com/nexus/repository/maven-public/")
-        maven("https://plugins.gradle.org/m2/")
-        gradlePluginPortal()
-        mavenCentral()
+package icu.h2l.login.auth.floodgate.listener
+
+import com.velocitypowered.api.event.Subscribe
+import icu.h2l.api.event.profile.VerifyInitialGameProfileEvent
+import org.geysermc.floodgate.api.FloodgateApi
+
+class FloodgateGameProfileListener {
+    @Subscribe
+    fun onVerifyInitialGameProfile(event: VerifyInitialGameProfileEvent) {
+        val floodgateApi = runCatching { FloodgateApi.getInstance() }.getOrNull() ?: return
+        if (!floodgateApi.isFloodgatePlayer(event.gameProfile.id)) {
+            return
+        }
+        event.pass = true
     }
 }
 
-rootProject.name = "HyperzoneLogin"
-
-include("velocity")
-include("api")
-include("auth-floodgate")
-include("auth-yggd")
-include("auth-offline")
-include("safe")
-include("data-merge")
-include("profile-skin")

@@ -157,6 +157,7 @@ spotless {
     kotlin {
         target(
             "api/src/**/*.kt",
+            "auth-floodgate/src/**/*.kt",
             "auth-offline/src/**/*.kt",
             "auth-yggd/src/**/*.kt",
             "data-merge/src/**/*.kt",
@@ -172,6 +173,7 @@ spotless {
             "build.gradle.kts",
             "settings.gradle.kts",
             "api/build.gradle.kts",
+            "auth-floodgate/build.gradle.kts",
             "auth-offline/build.gradle.kts",
             "auth-yggd/build.gradle.kts",
             "data-merge/build.gradle.kts",
@@ -195,6 +197,7 @@ subprojects {
         maven("https://repo.papermc.io/repository/maven-public/")
         maven("https://maven.fabricmc.net/")
         maven("https://maven.elytrium.net/repo/")
+        maven("https://repo.opencollab.dev/maven-snapshots")
     }
 
     tasks.withType(ProcessResources::class.java).configureEach {

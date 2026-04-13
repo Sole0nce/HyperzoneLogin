@@ -3,6 +3,6 @@
   "name":"HyperZoneLogin",
   "version":"${pluginVersion}",
   "authors":["ksqeib"],
-  "dependencies":[{"id":"limboapi","optional":true}],
+  "dependencies":[{"id":"limboapi","optional":true},{"id":"floodgate","optional":true}],
   "main":"icu.h2l.login.HyperZoneLoginBootstrap"
 }

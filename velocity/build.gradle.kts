@@ -37,6 +37,7 @@ val bstatsRelocatedClasspath by configurations.creating {
 }
 
 val embeddedModuleProjects = listOf(
+    project(":auth-floodgate"),
     project(":auth-offline"),
     project(":auth-yggd"),
     project(":data-merge"),
@@ -58,7 +59,7 @@ val relocateBstatsCompileOnlyJar by tasks.registering(ShadowJar::class) {
 }
 
 dependencies {
-    // Modules (auth-offline, auth-yggd, data-merge) are now separate Velocity plugins
+    // Modules (auth-floodgate, auth-offline, auth-yggd, data-merge) are now separate Velocity plugins
     // and will register themselves with the main plugin at runtime. Do not include
     // them as project dependencies here so they are not bundled into the main plugin jar.
     implementation(project(":api"))
@@ -77,6 +78,7 @@ dependencies {
     compileOnly(libs.velocityProxy) // From Elytrium Repo.
 //    limbo
     compileOnly(libs.limboApi)
+    compileOnly(libs.floodgateApi)
     add(bstatsRelocatedClasspath.name, libs.bstatsVelocity)
     compileOnly(files(relocateBstatsCompileOnlyJar.flatMap { it.archiveFile }))
     needPackageCompileOnly(libs.bstatsVelocity)

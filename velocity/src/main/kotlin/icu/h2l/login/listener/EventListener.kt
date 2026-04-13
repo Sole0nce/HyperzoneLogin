@@ -26,6 +26,7 @@ import com.velocitypowered.api.event.player.GameProfileRequestEvent
 import icu.h2l.api.connection.disconnectWithMessage
 import icu.h2l.api.event.connection.OpenStartAuthEvent
 import icu.h2l.api.event.connection.OpenPreLoginEvent
+import icu.h2l.api.event.profile.VerifyInitialGameProfileEvent
 import icu.h2l.api.util.RemapUtils
 import icu.h2l.login.HyperZoneLoginMain
 import icu.h2l.login.manager.HyperZonePlayerManager
@@ -65,9 +66,20 @@ class EventListener {
 
         val incomingProfile = event.gameProfile
         val incomingName = incomingProfile.name
+        val verifyEvent = VerifyInitialGameProfileEvent(event.connection, incomingProfile)
         fun disconnectWithError(logMessage: String, userMessage: String) {
             HyperZoneLoginMain.getInstance().logger.error(logMessage)
             event.connection.disconnectWithMessage(Component.text(userMessage, NamedTextColor.RED))
+        }
+
+        try {
+            HyperZoneLoginMain.getInstance().proxy.eventManager.fire(verifyEvent).join()
+        } catch (t: Throwable) {
+            HyperZoneLoginMain.getInstance().logger.error("初始 GameProfile 扩展校验事件执行失败: ${t.message}", t)
+        }
+
+        if (verifyEvent.pass) {
+            return
         }
 
         if (!incomingName.startsWith(EXPECTED_NAME_PREFIX)) {

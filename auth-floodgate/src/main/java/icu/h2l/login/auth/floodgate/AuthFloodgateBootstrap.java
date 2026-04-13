@@ -19,23 +19,24 @@
  *
  */
 
-pluginManagement {
-    repositories {
-        maven("https://maven.aliyun.com/repository/central")
-        maven("https://mirrors.cloud.tencent.com/nexus/repository/maven-public/")
-        maven("https://plugins.gradle.org/m2/")
-        gradlePluginPortal()
-        mavenCentral()
+package icu.h2l.login.auth.floodgate;
+
+import com.google.inject.Inject;
+import com.velocitypowered.api.event.Subscribe;
+import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
+import com.velocitypowered.api.proxy.ProxyServer;
+
+public final class AuthFloodgateBootstrap {
+    private final AuthFloodgatePlugin delegate;
+
+    @Inject
+    public AuthFloodgateBootstrap(ProxyServer server) {
+        this.delegate = new AuthFloodgatePlugin(server);
+    }
+
+    @Subscribe
+    public void onEnable(ProxyInitializeEvent event) {
+        this.delegate.onEnable(event);
     }
 }
 
-rootProject.name = "HyperzoneLogin"
-
-include("velocity")
-include("api")
-include("auth-floodgate")
-include("auth-yggd")
-include("auth-offline")
-include("safe")
-include("data-merge")
-include("profile-skin")

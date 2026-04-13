@@ -28,9 +28,18 @@ data class EmbeddedModuleSpec(
     val displayName: String,
     val externalPluginId: String,
     val implementationClassName: String,
+    val requiredPluginIds: List<String> = emptyList(),
 )
 
 object EmbeddedModuleRegistry {
+    val authFloodgate = EmbeddedModuleSpec(
+        configKey = "authFloodgate",
+        displayName = "Auth Floodgate",
+        externalPluginId = "hzl-auth-floodgate",
+        implementationClassName = "icu.h2l.login.auth.floodgate.FloodgateSubModule",
+        requiredPluginIds = listOf("floodgate"),
+    )
+
     val authOffline = EmbeddedModuleSpec(
         configKey = "authOffline",
         displayName = "Auth Offline",

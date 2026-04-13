@@ -218,6 +218,7 @@ class HyperZoneLoginMain(
     }
 
     private fun registerConfiguredEmbeddedModules() {
+        registerEmbeddedModule(EmbeddedModuleRegistry.authFloodgate, modulesConfig.authFloodgate)
         registerEmbeddedModule(EmbeddedModuleRegistry.authOffline, modulesConfig.authOffline)
         registerEmbeddedModule(EmbeddedModuleRegistry.authYggd, modulesConfig.authYggd)
         registerEmbeddedModule(EmbeddedModuleRegistry.safe, modulesConfig.safe)
@@ -233,6 +234,16 @@ class HyperZoneLoginMain(
 
         if (proxy.pluginManager.getPlugin(spec.externalPluginId).isPresent) {
             logger.info("检测到外部插件 ${spec.externalPluginId}，跳过内置模块 ${spec.displayName}")
+            return
+        }
+
+        val missingRequiredPlugins = spec.requiredPluginIds.filter { requiredPluginId ->
+            !proxy.pluginManager.getPlugin(requiredPluginId).isPresent
+        }
+        if (missingRequiredPlugins.isNotEmpty()) {
+            logger.info(
+                "内置模块 ${spec.displayName} 依赖插件缺失: ${missingRequiredPlugins.joinToString()}，已跳过"
+            )
             return
         }
 

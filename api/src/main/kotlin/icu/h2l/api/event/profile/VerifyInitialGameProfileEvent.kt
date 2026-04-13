@@ -19,23 +19,23 @@
  *
  */
 
-pluginManagement {
-    repositories {
-        maven("https://maven.aliyun.com/repository/central")
-        maven("https://mirrors.cloud.tencent.com/nexus/repository/maven-public/")
-        maven("https://plugins.gradle.org/m2/")
-        gradlePluginPortal()
-        mavenCentral()
-    }
+package icu.h2l.api.event.profile
+
+import com.velocitypowered.api.event.annotation.AwaitingEvent
+import com.velocitypowered.api.proxy.InboundConnection
+import com.velocitypowered.api.util.GameProfile
+
+/**
+ * 在代理层收到客户端初始 GameProfile 后触发。
+ *
+ * 监听器可将 [pass] 设为 true，表示该初始档案已被外部模块确认可信，
+ * 主插件随后将跳过自己的 remap 前缀/UUID 校验流程。
+ */
+@AwaitingEvent
+class VerifyInitialGameProfileEvent(
+    val connection: InboundConnection,
+    val gameProfile: GameProfile,
+) {
+    var pass: Boolean = false
 }
 
-rootProject.name = "HyperzoneLogin"
-
-include("velocity")
-include("api")
-include("auth-floodgate")
-include("auth-yggd")
-include("auth-offline")
-include("safe")
-include("data-merge")
-include("profile-skin")

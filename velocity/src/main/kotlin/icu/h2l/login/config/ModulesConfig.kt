@@ -26,6 +26,9 @@ import org.spongepowered.configurate.objectmapping.meta.Comment
 
 @ConfigSerializable
 class ModulesConfig {
+    @Comment("是否启用内置 Floodgate 识别模块；仅在已安装 floodgate 时生效，若同时安装 hzl-auth-floodgate 外部插件，则自动跳过内置版本")
+    val authFloodgate: Boolean = true
+
     @Comment("是否启用内置离线认证模块；若同时安装 hzl-auth-offline 外部插件，则自动跳过内置版本")
     val authOffline: Boolean = true
 

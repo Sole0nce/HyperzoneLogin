@@ -19,23 +19,17 @@
  *
  */
 
-pluginManagement {
-    repositories {
-        maven("https://maven.aliyun.com/repository/central")
-        maven("https://mirrors.cloud.tencent.com/nexus/repository/maven-public/")
-        maven("https://plugins.gradle.org/m2/")
-        gradlePluginPortal()
-        mavenCentral()
+package icu.h2l.login.auth.floodgate
+
+import icu.h2l.api.HyperZoneApi
+import icu.h2l.api.log.info
+import icu.h2l.api.module.HyperSubModule
+import icu.h2l.login.auth.floodgate.listener.FloodgateGameProfileListener
+
+class FloodgateSubModule : HyperSubModule {
+    override fun register(api: HyperZoneApi) {
+        api.proxy.eventManager.register(api, FloodgateGameProfileListener())
+        info { "FloodgateSubModule 已加载，初始 GameProfile 放行监听器已注册" }
     }
 }
 
-rootProject.name = "HyperzoneLogin"
-
-include("velocity")
-include("api")
-include("auth-floodgate")
-include("auth-yggd")
-include("auth-offline")
-include("safe")
-include("data-merge")
-include("profile-skin")

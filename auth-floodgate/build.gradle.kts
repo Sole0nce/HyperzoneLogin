@@ -19,23 +19,22 @@
  *
  */
 
-pluginManagement {
-    repositories {
-        maven("https://maven.aliyun.com/repository/central")
-        maven("https://mirrors.cloud.tencent.com/nexus/repository/maven-public/")
-        maven("https://plugins.gradle.org/m2/")
-        gradlePluginPortal()
-        mavenCentral()
-    }
+plugins {
+    alias(libs.plugins.kotlin)
 }
 
-rootProject.name = "HyperzoneLogin"
+dependencies {
+    // Build as standalone plugin; api is provided at runtime by the main plugin
+    compileOnly(project(":api"))
+    compileOnly(libs.velocityApi)
+    compileOnly(libs.floodgateApi)
 
-include("velocity")
-include("api")
-include("auth-floodgate")
-include("auth-yggd")
-include("auth-offline")
-include("safe")
-include("data-merge")
-include("profile-skin")
+    testImplementation(platform(libs.junitBom))
+    testImplementation(libs.junitJupiter)
+    testRuntimeOnly(libs.junitPlatformLauncher)
+}
+
+tasks.test {
+    useJUnitPlatform()
+}
+
