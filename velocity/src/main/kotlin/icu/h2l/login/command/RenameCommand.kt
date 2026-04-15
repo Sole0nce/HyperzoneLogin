@@ -61,12 +61,14 @@ class RenameCommand : HyperChatCommandExecutor {
             messages.send(source, MessageKeys.Rename.NOT_IN_WAITING_AREA)
             return
         }
+
         if (hyperZonePlayer.hasAttachedProfile()) {
             messages.send(source, MessageKeys.Rename.ALREADY_BOUND)
             return
         }
 
         val newRegistrationName = args[0].trim()
+
         if (newRegistrationName.equals(hyperZonePlayer.registrationName, ignoreCase = true)) {
             messages.send(source, MessageKeys.Rename.SAME_AS_CURRENT)
             return

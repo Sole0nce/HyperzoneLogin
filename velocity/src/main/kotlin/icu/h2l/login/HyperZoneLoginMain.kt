@@ -61,6 +61,7 @@ import icu.h2l.login.listener.LoginReUuidListener
 import icu.h2l.login.module.EmbeddedModuleRegistry
 import icu.h2l.login.module.EmbeddedModuleSpec
 import icu.h2l.login.profile.ProfileBindingCodeService
+import icu.h2l.login.profile.VCProfileManager
 import icu.h2l.login.profile.VelocityHyperZoneProfileService
 import icu.h2l.login.util.registerApiLogger
 import net.kyori.adventure.text.logger.slf4j.ComponentLogger
@@ -82,6 +83,7 @@ class HyperZoneLoginMain(
     lateinit var databaseManager: icu.h2l.login.manager.DatabaseManager
     lateinit var databaseHelper: DatabaseHelper
     lateinit var profileService: VelocityHyperZoneProfileService
+    lateinit var vcProfileManager: VCProfileManager
     lateinit var bindingCodeService: ProfileBindingCodeService
     lateinit var messageService: MessageService
     val serverAdapter: HyperZoneVServerAdapter?
@@ -137,6 +139,7 @@ class HyperZoneLoginMain(
         // 创建基础表（Profile 表等）
         createBaseTables()
         profileService = VelocityHyperZoneProfileService(databaseHelper)
+        vcProfileManager = VCProfileManager(profileService, logger)
         bindingCodeService = ProfileBindingCodeService(
             BindingCodeRepository(databaseManager, databaseManager.getBindingCodeTable()),
             profileService
@@ -217,6 +220,7 @@ class HyperZoneLoginMain(
         val hzlCommandMeta = proxy.commandManager.metaBuilder(hzlCommand).build()
         proxy.commandManager.register(hzlCommandMeta, hzlCommand)
         proxy.eventManager.register(plugin, ProfileLayerVerifyListener())
+        proxy.eventManager.register(plugin, vcProfileManager)
         proxy.eventManager.register(plugin, LoginRenameListener())
         proxy.eventManager.register(plugin, LoginReUuidListener())
         proxy.eventManager.register(plugin, PlayerAreaLifecycleListener)
@@ -404,7 +408,10 @@ class HyperZoneLoginMain(
             .build()
         val node = loader.load()
         val config = node.get(MiscConfig::class.java)
-        if (firstCreation) {
+        val shouldPersistDefaults = firstCreation
+            || node.node("enableNameHotChange").virtual()
+            || node.node("enableUuidHotChange").virtual()
+        if (shouldPersistDefaults) {
             node.set(config)
             loader.save(node)
         }

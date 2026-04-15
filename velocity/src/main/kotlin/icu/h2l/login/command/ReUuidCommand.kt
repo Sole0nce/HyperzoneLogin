@@ -59,6 +59,7 @@ class ReUuidCommand : HyperChatCommandExecutor {
             messages.send(source, MessageKeys.ReUuid.NOT_IN_WAITING_AREA)
             return
         }
+
         if (hyperZonePlayer.hasAttachedProfile()) {
             messages.send(source, MessageKeys.ReUuid.ALREADY_BOUND)
             return

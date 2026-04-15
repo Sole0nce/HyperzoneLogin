@@ -27,12 +27,21 @@ import icu.h2l.login.manager.DatabaseManager
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.update
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * 数据库操作示例和帮助类
+ * Profile 数据库访问帮助类。
+ *
+ * 默认职责边界：
+ * - 创建新 Profile；
+ * - 读取既有 Profile；
+ * - 提供围绕创建/读取流程所需的受控业务辅助能力。
+ *
+ * 重要约束：
+ * - 除非需求被明确强调，否则不要在这里新增“修改现有 Profile 正式数据”的接口；
+ * - 特别是不要把运行时 GameProfile 替换、Velocity 内存索引补偿、等待区临时态修正，误实现为这里的数据库更新；
+ * - 这里不是现有 Profile name / UUID 热修改入口。
  */
 class DatabaseHelper(
     private val manager: DatabaseManager
@@ -49,11 +58,6 @@ class DatabaseHelper(
         profileCacheByUuid[profile.uuid] = profile
     }
 
-    private fun removeProfileCache(profile: Profile) {
-        profileCacheById.remove(profile.id)
-        profileCacheByName.remove(profile.name.lowercase())
-        profileCacheByUuid.remove(profile.uuid)
-    }
 
     private fun loadProfileById(profileId: UUID): Profile? {
         return manager.executeTransaction {
@@ -214,38 +218,6 @@ class DatabaseHelper(
         return null
     }
 
-    /**
-     * 更新档案名称
-     * 
-     * @param profileId 档案ID
-     * @param newName 新名称
-     * @return 是否更新成功
-     */
-    fun updateProfileName(profileId: UUID, newName: String): Boolean {
-        return try {
-            val updated = manager.executeTransaction {
-                profileTable.update({ profileTable.id eq profileId }) {
-                    it[name] = newName
-                }
-            } > 0
-
-            if (!updated) {
-                return false
-            }
-
-            val oldCached = profileCacheById[profileId]
-            if (oldCached != null) {
-                removeProfileCache(oldCached)
-            }
-
-            loadProfileById(profileId)?.let { cacheProfile(it) }
-
-            true
-        } catch (e: Exception) {
-            warn { "更新档案名称失败: ${e.message}" }
-            false
-        }
-    }
 
     /**
      * 获取档案信息

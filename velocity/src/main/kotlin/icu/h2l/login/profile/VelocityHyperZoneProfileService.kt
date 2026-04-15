@@ -32,6 +32,20 @@ import icu.h2l.login.player.VelocityHyperZonePlayer
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
+/**
+ * Velocity 侧正式 Profile 服务。
+ *
+ * 该类的默认职责边界仅限于：
+ * - 读取既有 Profile；
+ * - 创建新 Profile；
+ * - attach 当前登录态玩家到既有 Profile；
+ * - 处理与 attach / bind 相关的业务逻辑。
+ *
+ * 重要约束：
+ * - 除非需求被**明确、单独、强语义**地说明，否则这里**不应**新增“修改现有 Profile 数据”的接口；
+ * - 尤其禁止把运行时显示修正、Velocity 内存补偿同步、等待区临时态变更，错误地下沉为这里的正式 Profile 改写；
+ * - 现有 Profile 的 name / UUID 属于正式数据，默认视为不可在此处随意变更。
+ */
 class VelocityHyperZoneProfileService(
     private val databaseHelper: DatabaseHelper
 ) : HyperZoneProfileService {
@@ -189,6 +203,7 @@ class VelocityHyperZoneProfileService(
         val resolvedUuid = resolveRequestedUuid(userName, uuid)
         return databaseHelper.validateTrustedProfileCreate(userName, resolvedUuid)
     }
+
 
     override fun bindSubmittedCredentials(player: HyperZonePlayer, profileId: UUID): Profile {
         val targetProfile = databaseHelper.getProfile(profileId)
