@@ -32,6 +32,9 @@ import icu.h2l.api.command.HyperChatBrigadierRegistration
 import icu.h2l.api.command.HyperChatCommandExecutor
 import icu.h2l.api.command.HyperChatCommandInvocation
 import icu.h2l.api.command.HyperChatCommandRegistration
+import icu.h2l.login.command.BindCodeBrigadierCommands
+import icu.h2l.login.command.ReUuidCommand
+import icu.h2l.login.command.RenameCommand
 import io.mockk.mockk
 import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -101,6 +104,88 @@ class HyperChatCommandManagerProxyFallbackTest {
         dispatcher.execute("login", source)
 
         assertArrayEquals(emptyArray(), capturedArgs)
+    }
+
+    @Test
+    fun `rename command keeps hint node and raw arguments bridge`() {
+        val registration = HyperChatCommandRegistration(
+            name = "rename",
+            executor = NoopExecutor,
+            brigadier = RenameCommand.brigadier()
+        )
+        val builder = HyperChatCommandManagerImpl.createProxyFallbackCommandTree(registration, newContext(registration))
+        val root = builder.build()
+
+        assertEquals(setOf("name", VelocityCommands.ARGS_NODE_NAME), childNames(root))
+    }
+
+    @Test
+    fun `reuuid command keeps executable root and raw arguments bridge`() {
+        val registration = HyperChatCommandRegistration(
+            name = "reUUID",
+            aliases = setOf("reuuid", "reUuid"),
+            executor = NoopExecutor,
+            brigadier = ReUuidCommand.brigadier()
+        )
+        var capturedArgs: Array<String>? = null
+        val context = newContext(registration) { _, args ->
+            capturedArgs = args
+            1
+        }
+        val dispatcher = CommandDispatcher<CommandSource>()
+        val source = mockk<CommandSource>(relaxed = true)
+
+        dispatcher.register(HyperChatCommandManagerImpl.createProxyFallbackCommandTree(registration, context))
+        dispatcher.execute("reUUID", source)
+
+        assertArrayEquals(emptyArray(), capturedArgs)
+        assertEquals(setOf(VelocityCommands.ARGS_NODE_NAME), childNames(dispatcher.root.getChild("reUUID")!!))
+    }
+
+    @Test
+    fun `bindcode command keeps explicit subcommands and accepts special characters through raw bridge`() {
+        val registration = HyperChatCommandRegistration(
+            name = "bindcode",
+            aliases = setOf("bcode"),
+            executor = NoopExecutor,
+            brigadier = BindCodeBrigadierCommands.bindCode()
+        )
+        var capturedArgs: Array<String>? = null
+        val context = newContext(registration) { _, args ->
+            capturedArgs = args
+            1
+        }
+        val dispatcher = CommandDispatcher<CommandSource>()
+        val source = mockk<CommandSource>(relaxed = true)
+
+        dispatcher.register(HyperChatCommandManagerImpl.createProxyFallbackCommandTree(registration, context))
+        dispatcher.execute("bindcode use !@#CODE", source)
+
+        val root = requireNotNull(dispatcher.root.getChild("bindcode"))
+        assertEquals(setOf("generate", "use", VelocityCommands.ARGS_NODE_NAME), childNames(root))
+        assertArrayEquals(arrayOf("use", "!@#CODE"), capturedArgs)
+    }
+
+    @Test
+    fun `default root-only command still gets raw arguments bridge`() {
+        val registration = HyperChatCommandRegistration(
+            name = "exit",
+            executor = NoopExecutor,
+            brigadier = null
+        )
+        var capturedArgs: Array<String>? = null
+        val context = newContext(registration) { _, args ->
+            capturedArgs = args
+            1
+        }
+        val dispatcher = CommandDispatcher<CommandSource>()
+        val source = mockk<CommandSource>(relaxed = true)
+
+        dispatcher.register(HyperChatCommandManagerImpl.createProxyFallbackCommandTree(registration, context))
+        dispatcher.execute("exit anything-goes", source)
+
+        assertEquals(setOf(VelocityCommands.ARGS_NODE_NAME), childNames(dispatcher.root.getChild("exit")!!))
+        assertArrayEquals(arrayOf("anything-goes"), capturedArgs)
     }
 
     private fun registration(
