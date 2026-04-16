@@ -96,6 +96,7 @@ class HyperChatBrigadierContext(
             )
         }
 
+
     /**
      * 按连续空白拆分命令参数。
      */

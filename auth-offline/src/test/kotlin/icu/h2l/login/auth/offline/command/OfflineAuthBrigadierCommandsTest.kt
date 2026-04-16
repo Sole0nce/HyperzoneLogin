@@ -22,6 +22,7 @@
 package icu.h2l.login.auth.offline.command
 
 import com.mojang.brigadier.CommandDispatcher
+import com.mojang.brigadier.tree.CommandNode
 import com.velocitypowered.api.command.CommandSource
 import icu.h2l.api.command.HyperChatBrigadierContext
 import icu.h2l.api.command.HyperChatBrigadierRegistration
@@ -34,6 +35,66 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 class OfflineAuthBrigadierCommandsTest {
+    @Test
+    fun `register keeps descriptive password placeholders`() {
+        val dispatcher = dispatcher("register", OfflineAuthBrigadierCommands.register())
+        val registerNode = requireNotNull(dispatcher.root.getChild("register"))
+        val passwordNode = requireNotNull(registerNode.getChild("password"))
+
+        assertEquals(setOf("password", "arguments"), childNames(registerNode))
+        assertEquals(setOf("confirmPassword"), childNames(passwordNode))
+    }
+
+    @Test
+    fun `login keeps descriptive password and as placeholders`() {
+        val dispatcher = dispatcher("login", OfflineAuthBrigadierCommands.login())
+        val loginNode = requireNotNull(dispatcher.root.getChild("login"))
+        val passwordNode = requireNotNull(loginNode.getChild("password"))
+        val asNode = requireNotNull(loginNode.getChild("as"))
+        val usernameNode = requireNotNull(asNode.getChild("username"))
+
+        assertEquals(setOf("password", "as", "arguments"), childNames(loginNode))
+        assertEquals(setOf("code"), childNames(passwordNode))
+        assertEquals(setOf("password"), childNames(usernameNode))
+    }
+
+    @Test
+    fun `email and totp keep descriptive subcommand trees`() {
+        val emailDispatcher = dispatcher("email", OfflineAuthBrigadierCommands.email())
+        val totpDispatcher = dispatcher("totp", OfflineAuthBrigadierCommands.totp())
+        val emailNode = requireNotNull(emailDispatcher.root.getChild("email"))
+        val totpNode = requireNotNull(totpDispatcher.root.getChild("totp"))
+
+        assertEquals(setOf("add", "change", "show", "recovery", "code", "setpassword", "arguments"), childNames(emailNode))
+        assertEquals(setOf("add", "enable", "confirm", "remove", "disable", "arguments"), childNames(totpNode))
+        assertEquals(setOf("currentPassword"), childNames(requireNotNull(emailNode.getChild("add"))))
+        assertEquals(setOf("password"), childNames(requireNotNull(totpNode.getChild("add"))))
+    }
+
+    @Test
+    fun `login root executes with empty arguments so usage can be shown`() {
+        val execution = execute(
+            registrationName = "login",
+            brigadier = OfflineAuthBrigadierCommands.login(),
+            input = "login"
+        )
+
+        assertEquals("login", execution.alias)
+        assertArrayEquals(emptyArray(), execution.args)
+    }
+
+    @Test
+    fun `register root executes with empty arguments so usage can be shown`() {
+        val execution = execute(
+            registrationName = "register",
+            brigadier = OfflineAuthBrigadierCommands.register(),
+            input = "register"
+        )
+
+        assertEquals("register", execution.alias)
+        assertArrayEquals(emptyArray(), execution.args)
+    }
+
     @Test
     fun `register passes special character passwords unchanged`() {
         val execution = execute(
@@ -145,9 +206,28 @@ class OfflineAuthBrigadierCommandsTest {
         brigadier: HyperChatBrigadierRegistration,
         input: String
     ): CapturedExecution {
-        val source = mockk<CommandSource>(relaxed = true)
         var alias: String? = null
         var args: Array<String>? = null
+        val dispatcher = dispatcher(registrationName, brigadier) { commandAlias, commandArgs ->
+                alias = commandAlias
+                args = commandArgs
+                1
+            }
+
+        val source = mockk<CommandSource>(relaxed = true)
+        dispatcher.execute(input, source)
+
+        return CapturedExecution(
+            alias = requireNotNull(alias),
+            args = requireNotNull(args)
+        )
+    }
+
+    private fun dispatcher(
+        registrationName: String,
+        brigadier: HyperChatBrigadierRegistration,
+        executor: (String, Array<String>) -> Int = { _, _ -> 1 }
+    ): CommandDispatcher<CommandSource> {
         val registration = HyperChatCommandRegistration(
             name = registrationName,
             executor = NoopExecutor,
@@ -157,23 +237,20 @@ class OfflineAuthBrigadierCommandsTest {
             registration = registration,
             visibility = { true },
             executor = { _, commandAlias, commandArgs ->
-                alias = commandAlias
-                args = commandArgs
-                1
+                executor(commandAlias, commandArgs)
             }
         )
-        val dispatcher = CommandDispatcher<CommandSource>()
 
-        dispatcher.register(brigadier.create(context))
-        dispatcher.execute(input, source)
-
-        return CapturedExecution(
-            alias = requireNotNull(alias),
-            args = requireNotNull(args)
-        )
+        return CommandDispatcher<CommandSource>().also { dispatcher ->
+            dispatcher.register(brigadier.create(context))
+        }
     }
 
-    private data class CapturedExecution(
+    private fun childNames(node: CommandNode<CommandSource>): Set<String> {
+        return node.children.mapTo(linkedSetOf()) { it.name }
+    }
+
+    private class CapturedExecution(
         val alias: String,
         val args: Array<String>
     )
