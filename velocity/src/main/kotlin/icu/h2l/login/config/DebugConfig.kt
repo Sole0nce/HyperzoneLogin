@@ -26,17 +26,18 @@ import org.spongepowered.configurate.objectmapping.meta.Comment
 
 @Suppress("ANNOTATION_WILL_BE_APPLIED_ALSO_TO_PROPERTY_OR_FIELD")
 @ConfigSerializable
-data class MiscConfig(
-    @Comment("是否启用替换 GameProfile")
-    val enableReplaceGameProfile: Boolean = true,
+data class DebugConfig(
+    @Comment("开启 debug 日志")
+    val enabled: Boolean = true,
 
-    @Comment("是否允许已 attach 的正式 Profile 在线热改 name（风险较低，默认开启）")
-    val enableNameHotChange: Boolean = true,
 
-    @Comment("是否允许已 attach 的正式 Profile 在线热改 UUID（高风险，默认关闭）")
-    val enableUuidHotChange: Boolean = false,
-
-    @Comment("不给服务器发送 CHAT_SESSION_UPDATE包")
-    val killChatSession: Boolean = true
+    @Comment("慢测试模式相关配置")
+    val slowTest: SlowTestConfig = SlowTestConfig()
 )
 
+@Suppress("ANNOTATION_WILL_BE_APPLIED_ALSO_TO_PROPERTY_OR_FIELD")
+@ConfigSerializable
+data class SlowTestConfig(
+    @Comment("开启后，外部模块直接调用 overVerify 将被忽略，只有等待区 /over 才会真正完成 overVerify")
+    val enabled: Boolean = false
+)

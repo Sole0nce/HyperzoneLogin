@@ -127,5 +127,13 @@ object MessageKeys {
         const val NOT_IN_WAITING_AREA = "exit.not-in-waiting-area"
         const val ATTEMPTED = "exit.attempted"
     }
+
+    object Over {
+        const val USAGE = "over.usage"
+        const val DISABLED = "over.disabled"
+        const val NOT_IN_WAITING_AREA = "over.not-in-waiting-area"
+        const val FAILED = "over.failed"
+        const val BLOCKED_BY_SLOW_TEST = "over.blocked-by-slow-test"
+    }
 }
 

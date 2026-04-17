@@ -40,6 +40,7 @@ import icu.h2l.login.command.ReUuidCommand
 import icu.h2l.login.database.BindingCodeRepository
 import icu.h2l.login.config.BackendServerConfig
 import icu.h2l.login.config.DatabaseSourceConfig
+import icu.h2l.login.config.DebugConfig
 import icu.h2l.login.config.MessagesConfig
 import icu.h2l.login.config.MiscConfig
 import icu.h2l.login.config.ModulesConfig
@@ -50,6 +51,7 @@ import icu.h2l.login.inject.network.VelocityNetworkModule
 import icu.h2l.login.vServer.backend.BackendAuthHoldListener
 import icu.h2l.login.vServer.limbo.LimboVServerAuth
 import icu.h2l.login.vServer.command.ExitVServerCommand
+import icu.h2l.login.vServer.command.OverVServerCommand
 import icu.h2l.login.listener.ProfileLayerVerifyListener
 import icu.h2l.login.listener.PlayerAreaLifecycleListener
 import icu.h2l.login.manager.HyperChatCommandManagerImpl
@@ -65,6 +67,7 @@ import icu.h2l.login.profile.VCProfileManager
 import icu.h2l.login.profile.VelocityHyperZoneProfileService
 import icu.h2l.login.util.registerApiLogger
 import net.kyori.adventure.text.logger.slf4j.ComponentLogger
+import org.spongepowered.configurate.ConfigurationNode
 import org.spongepowered.configurate.ConfigurationOptions
 import org.spongepowered.configurate.hocon.HoconConfigurationLoader
 import org.spongepowered.configurate.kotlin.dataClassFieldDiscoverer
@@ -79,6 +82,13 @@ class HyperZoneLoginMain(
     val dataDirectory: Path,
     private val plugin: HyperZoneApi
 ) {
+    private val slowTestOverRegistration = HyperChatCommandRegistration(
+        name = "over",
+        executor = OverVServerCommand()
+    )
+    @Volatile
+    private var slowTestCommandRegistered = false
+
     var activeVServerAdapter: HyperZoneVServerAdapter? = null
     lateinit var databaseManager: icu.h2l.login.manager.DatabaseManager
     lateinit var databaseHelper: DatabaseHelper
@@ -99,6 +109,7 @@ class HyperZoneLoginMain(
         private lateinit var databaseSourceConfig: DatabaseSourceConfig
         private lateinit var remapConfig: RemapConfig
         private lateinit var miscConfig: MiscConfig
+        private lateinit var debugConfig: DebugConfig
         private lateinit var modulesConfig: ModulesConfig
         private lateinit var backendServerConfig: BackendServerConfig
         private lateinit var messagesConfig: MessagesConfig
@@ -111,6 +122,9 @@ class HyperZoneLoginMain(
 
         @JvmStatic
         fun getMiscConfig(): MiscConfig = miscConfig
+
+        @JvmStatic
+        fun getDebugConfig(): DebugConfig = debugConfig
 
         @JvmStatic
         fun getBackendServerConfig(): BackendServerConfig = backendServerConfig
@@ -129,6 +143,7 @@ class HyperZoneLoginMain(
         loadDatabaseConfig()
         loadRemapConfig()
         loadMiscConfig()
+        loadDebugConfig()
         loadModulesConfig()
         loadBackendServerConfig()
         loadMessagesConfig()
@@ -208,6 +223,7 @@ class HyperZoneLoginMain(
             )
         )
         BindCodeCommandRegistrar.register(chatCommandManager, bindingCodeService)
+        syncSlowTestCommands()
 
 //        最后加载模块
         // Keep internal modules that are part of the main plugin
@@ -314,15 +330,30 @@ class HyperZoneLoginMain(
     fun reloadRuntimeConfigs() {
         loadRemapConfig()
         loadMiscConfig()
+        loadDebugConfig()
         loadModulesConfig()
         loadBackendServerConfig()
         loadMessagesConfig()
         if (::messageService.isInitialized) {
             messageService.load(messagesConfig)
         }
+        syncSlowTestCommands()
     }
 
+    private fun syncSlowTestCommands() {
+        if (debugConfig.slowTest.enabled) {
+            if (!slowTestCommandRegistered) {
+                chatCommandManager.register(slowTestOverRegistration)
+                slowTestCommandRegistered = true
+            }
+            return
+        }
 
+        if (slowTestCommandRegistered) {
+            chatCommandManager.unregister(slowTestOverRegistration.name)
+            slowTestCommandRegistered = false
+        }
+    }
 
     private fun loadDatabaseConfig() {
         val path = dataDirectory.resolve("database.conf")
@@ -407,17 +438,129 @@ class HyperZoneLoginMain(
             .path(path)
             .build()
         val node = loader.load()
-        val config = node.get(MiscConfig::class.java)
-        val shouldPersistDefaults = firstCreation
-            || node.node("enableNameHotChange").virtual()
-            || node.node("enableUuidHotChange").virtual()
+        val config = readMiscConfig(node)
+        val shouldPersistDefaults = firstCreation || hasLegacyMiscLayout(node)
         if (shouldPersistDefaults) {
             node.set(config)
             loader.save(node)
         }
-        if (config != null) {
-            miscConfig = config
+        miscConfig = config
+    }
+
+    private fun readMiscConfig(node: ConfigurationNode): MiscConfig {
+        val loaded = runCatching {
+            node.get(MiscConfig::class.java)
+        }.getOrNull() ?: MiscConfig()
+
+        val legacyEnableNameHotChange = node.node("enableNameHotChange").getBooleanOrNull()
+        val legacyEnableUuidHotChange = node.node("enableUuidHotChange").getBooleanOrNull()
+        val legacyEmbeddedEnableNameHotChange = node.node("debug", "enableNameHotChange").getBooleanOrNull()
+        val legacyEmbeddedEnableUuidHotChange = node.node("debug", "enableUuidHotChange").getBooleanOrNull()
+
+        return loaded.copy(
+            enableNameHotChange = legacyEnableNameHotChange
+                ?: legacyEmbeddedEnableNameHotChange
+                ?: loaded.enableNameHotChange,
+            enableUuidHotChange = legacyEnableUuidHotChange
+                ?: legacyEmbeddedEnableUuidHotChange
+                ?: loaded.enableUuidHotChange
+        )
+    }
+
+    private fun hasLegacyMiscLayout(node: ConfigurationNode): Boolean {
+        return !node.node("debug").virtual()
+            || !node.node("enableNameHotChange").virtual()
+            || !node.node("enableUuidHotChange").virtual()
+            || !node.node("slowTestEnabled").virtual()
+    }
+
+    private fun loadDebugConfig() {
+        val path = dataDirectory.resolve("debug.conf")
+        val firstCreation = Files.notExists(path)
+        val loader = HoconConfigurationLoader.builder()
+            .defaultOptions { opts: ConfigurationOptions ->
+                opts
+                    .shouldCopyDefaults(true)
+                    .header(
+                        """
+                            HyperZoneLogin Debug Configuration | by ksqeib
+                            包含 debug 日志与慢测试功能开关。
+
+                        """.trimIndent()
+                    ).serializers { s ->
+                        s.registerAnnotatedObjects(
+                            ObjectMapper.factoryBuilder().addDiscoverer(dataClassFieldDiscoverer()).build()
+                        )
+                    }
+            }
+            .path(path)
+            .build()
+        val node = loader.load()
+        val legacyMiscNode = loadLegacyMiscNodeOrNull()
+        val config = readDebugConfig(node, legacyMiscNode)
+        val shouldPersistDefaults = firstCreation || hasLegacyDebugLayout(node) || hasLegacyDebugSettingsInMisc(legacyMiscNode)
+        if (shouldPersistDefaults) {
+            node.set(config)
+            loader.save(node)
         }
+        debugConfig = config
+    }
+
+    private fun readDebugConfig(node: ConfigurationNode, legacyMiscNode: ConfigurationNode?): DebugConfig {
+        val loaded = runCatching {
+            node.get(DebugConfig::class.java)
+        }.getOrNull() ?: DebugConfig()
+
+        val legacyDebugBoolean = legacyMiscNode?.node("debug")?.raw() as? Boolean
+        val legacyEmbeddedDebugEnabled = legacyMiscNode?.node("debug", "enabled")?.getBooleanOrNull()
+        val legacyEmbeddedSlowTestEnabled = legacyMiscNode?.node("debug", "slowTest", "enabled")?.getBooleanOrNull()
+        val legacyFlatSlowTestEnabled = legacyMiscNode?.node("slowTestEnabled")?.getBooleanOrNull()
+
+        return loaded.copy(
+            enabled = legacyDebugBoolean
+                ?: legacyEmbeddedDebugEnabled
+                ?: loaded.enabled,
+            slowTest = loaded.slowTest.copy(
+                enabled = legacyEmbeddedSlowTestEnabled
+                    ?: legacyFlatSlowTestEnabled
+                    ?: loaded.slowTest.enabled
+            )
+        )
+    }
+
+    private fun hasLegacyDebugLayout(node: ConfigurationNode): Boolean {
+        return node.raw() is Boolean || !node.node("debug").virtual()
+    }
+
+    private fun loadLegacyMiscNodeOrNull(): ConfigurationNode? {
+        val path = dataDirectory.resolve("misc.conf")
+        if (Files.notExists(path)) {
+            return null
+        }
+
+        return HoconConfigurationLoader.builder()
+            .defaultOptions { opts: ConfigurationOptions ->
+                opts.serializers { s ->
+                    s.registerAnnotatedObjects(
+                        ObjectMapper.factoryBuilder().addDiscoverer(dataClassFieldDiscoverer()).build()
+                    )
+                }
+            }
+            .path(path)
+            .build()
+            .load()
+    }
+
+    private fun hasLegacyDebugSettingsInMisc(node: ConfigurationNode?): Boolean {
+        if (node == null) {
+            return false
+        }
+
+        return !node.node("debug").virtual() || !node.node("slowTestEnabled").virtual()
+    }
+
+    private fun ConfigurationNode.getBooleanOrNull(): Boolean? {
+        return if (virtual()) null else getBoolean()
     }
 
     private fun loadModulesConfig() {

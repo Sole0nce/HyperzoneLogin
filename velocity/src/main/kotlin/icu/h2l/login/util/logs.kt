@@ -38,7 +38,7 @@ private object VelocityLoggerBridge : HyperZoneLogger {
     }
 
     override fun debug(message: String) {
-        if (HyperZoneLoginMain.getMiscConfig().debug) {
+        if (HyperZoneLoginMain.getDebugConfig().enabled) {
             info("$DEBUG_MESSAGE_PREFIX$message")
         }
     }

@@ -66,6 +66,10 @@ object HyperChatCommandManagerImpl : HyperChatCommandManager {
     override fun unregister(name: String) {
         val registration = commands[name.lowercase()] ?: return
         commands.entries.removeIf { (_, value) -> value === registration }
+        val proxy = proxyServer
+        if (proxy != null && proxyRegisteredCommands.remove(registration.name.lowercase())) {
+            proxy.commandManager.unregister(registration.name)
+        }
     }
 
     override fun executeChat(source: CommandSource, chat: String): Boolean {

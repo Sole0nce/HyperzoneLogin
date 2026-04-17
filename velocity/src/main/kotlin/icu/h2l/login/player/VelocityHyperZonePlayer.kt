@@ -74,6 +74,7 @@ class VelocityHyperZonePlayer(
     private val isVerifiedState = AtomicBoolean(false)
     private val hasNotifiedReadyState = AtomicBoolean(false)
     private val submittedCredentials = CopyOnWriteArrayList<HyperZoneCredential>()
+    private val coreAuthorizedOverVerify = AtomicBoolean(false)
 
     /**
      * 玩家是否已经生成过可直接发送消息的实体。
@@ -153,9 +154,23 @@ class VelocityHyperZonePlayer(
     }
 
     override fun overVerify() {
+        if (HyperZoneLoginMain.getDebugConfig().slowTest.enabled && !coreAuthorizedOverVerify.get()) {
+            sendMessage(HyperZoneLoginMain.getInstance().messageService.render(this, MessageKeys.Over.BLOCKED_BY_SLOW_TEST))
+            return
+        }
+
         HyperZoneLoginMain.getInstance().profileService.attachVerifiedCredentialProfile(this)
         if (!hasAttachedProfile()) {
             sendMessage(HyperZoneLoginMain.getInstance().messageService.render(this, MessageKeys.Player.VERIFIED_UNBOUND))
+        }
+    }
+
+    internal fun runCoreAuthorizedOverVerify() {
+        coreAuthorizedOverVerify.set(true)
+        try {
+            overVerify()
+        } finally {
+            coreAuthorizedOverVerify.set(false)
         }
     }
 
