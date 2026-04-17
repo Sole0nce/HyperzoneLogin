@@ -25,6 +25,7 @@ import com.velocitypowered.api.event.Subscribe
 import com.velocitypowered.api.event.connection.DisconnectEvent
 import com.velocitypowered.api.event.player.PlayerChooseInitialServerEvent
 import com.velocitypowered.api.event.player.ServerConnectedEvent
+import com.velocitypowered.api.event.player.ServerPostConnectEvent
 import com.velocitypowered.api.event.player.ServerPreConnectEvent
 import com.velocitypowered.api.proxy.Player
 import com.velocitypowered.api.proxy.ProxyServer
@@ -203,12 +204,12 @@ class BackendAuthHoldListener(
     }
 
     @Subscribe
-    fun onServerConnected(event: ServerConnectedEvent) {
+    fun onServerConnected(event: ServerPostConnectEvent) {
         val player = event.player
         val hyperPlayer = getHyperPlayer(player) ?: return
         val state = backendHoldStates[player.getChannel()]
         val authServerName = state?.authServerName ?: configuredAuthServerName()
-        if (!event.server.serverInfo.name.equals(authServerName, ignoreCase = true)) return
+        if (!player.currentServer.get().serverInfo.name.equals(authServerName, ignoreCase = true)) return
         onAuthServerJoined(player, hyperPlayer)
     }
 

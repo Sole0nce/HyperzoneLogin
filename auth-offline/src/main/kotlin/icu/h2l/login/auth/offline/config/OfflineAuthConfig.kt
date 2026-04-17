@@ -27,30 +27,24 @@ import org.spongepowered.configurate.objectmapping.meta.Comment
 @ConfigSerializable
 class OfflineAuthConfig {
     @Comment("密码规则")
-    @JvmField
     val password = PasswordPolicy()
 
     @Comment("登录保护")
-    @JvmField
     val login = LoginProtection()
 
     @Comment("邮箱与找回")
-    @JvmField
     val email = EmailConfig()
 
     @Comment("提示")
-    @JvmField
     val prompt = PromptConfig()
 
     @Comment("会话自动登录")
-    @JvmField
     val session = SessionConfig()
 
     @Comment("是否透传标准离线 UUID")
     var passOfflineUuidToProfileResolve: Boolean = false
 
     @Comment("TOTP 二步验证")
-    @JvmField
     val totp = TotpConfig()
 
     @ConfigSerializable
@@ -98,7 +92,7 @@ class OfflineAuthConfig {
         val resetPasswordWindowMinutes = 10
 
         @Comment("恢复邮件模板与 SMTP 配置")
-        @JvmField
+
         val smtp = SmtpConfig()
     }
 
@@ -149,7 +143,8 @@ class OfflineAuthConfig {
         @Comment(
             "恢复邮件正文，支持占位符：%server%、%player%、%email%、%code%、%minutes%。使用 \\n 表示换行"
         )
-        val recoveryBody = "你好，%player%。\\n\\n你在 %server% 请求了离线账号密码找回。\\n验证码：%code%\\n有效期：%minutes% 分钟\\n\\n如果不是你本人操作，请忽略这封邮件。"
+        val recoveryBody =
+            "你好，%player%。\\n\\n你在 %server% 请求了离线账号密码找回。\\n验证码：%code%\\n有效期：%minutes% 分钟\\n\\n如果不是你本人操作，请忽略这封邮件。"
     }
 
     @ConfigSerializable

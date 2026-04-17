@@ -113,7 +113,7 @@ object PlayerAreaLifecycleListener {
     }
 
     @Subscribe
-    fun onServerConnected(event: ServerConnectedEvent) {
+    fun onServerConnected(event: ServerPostConnectEvent) {
         val player = event.player
         val hyperZonePlayer = HyperZonePlayerManager.getByPlayerOrNull(player) ?: return
         val adapterWaiting = HyperZoneLoginMain.getInstance().serverAdapter?.isPlayerInWaitingArea(player) == true
