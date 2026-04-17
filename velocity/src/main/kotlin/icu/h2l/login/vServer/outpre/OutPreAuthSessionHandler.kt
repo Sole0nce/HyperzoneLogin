@@ -52,7 +52,10 @@ import icu.h2l.login.inject.network.NettyReflectionHelper.reflectedCleanup
 import icu.h2l.login.inject.network.NettyReflectionHelper.reflectedDelegatedConnection
 import icu.h2l.login.inject.network.NettyReflectionHelper.reflectedTeardown
 import icu.h2l.login.manager.HyperZonePlayerManager
+import icu.h2l.login.player.ProfileSkinApplySupport
 import icu.h2l.login.util.buildAttachedIdentityGameProfile
+import icu.h2l.login.util.describeGameProfileBrief
+import icu.h2l.login.util.hasSemanticGameProfileDifference
 import icu.h2l.login.util.setConnectedPlayerGameProfile
 import io.netty.buffer.ByteBuf
 import net.kyori.adventure.text.Component
@@ -203,50 +206,62 @@ class OutPreAuthSessionHandler(
                 return@thenComposeAsync CompletableFuture.completedFuture(null)
             }
 
-            profile = buildAttachedIdentityGameProfile(
-                currentGameProfile = profileEvent.gameProfile,
-                attachedProfile = attachedProfile,
-            )
-            setConnectedPlayerGameProfile(player, profile)
+            if (hasSemanticGameProfileDifference(finalCandidateProfile, profileEvent.gameProfile)) {
+                logger.warn(
+                    "GameProfileRequestEvent returned a different profile for {} during outpre finalization. The returned profile will be ignored. This may indicate another profile management plugin is installed and could cause unknown conflicts. expected=[{}], actual=[{}]",
+                    player.username,
+                    describeGameProfileBrief(finalCandidateProfile),
+                    describeGameProfileBrief(profileEvent.gameProfile),
+                )
+            }
 
-            server.eventManager.fire(
-                PermissionsSetupEvent(player, NettyReflectionHelper.defaultPermissions())
-            ).thenComposeAsync({ event ->
+            ProfileSkinApplySupport.applyAsync(hyperPlayer, finalCandidateProfile).thenComposeAsync({ skinResolvedProfile ->
                 if (mcConnection.isClosed) {
                     return@thenComposeAsync CompletableFuture.completedFuture(null)
                 }
 
-                val function: PermissionFunction? = event.createFunction(player)
-                if (function == null) {
-                    logger.error(
-                        "A plugin permission provider {} provided an invalid permission function for player {}. Falling back to the default permission function.",
-                        event.provider.javaClass.name,
-                        player.username,
-                    )
-                } else {
-                    NettyReflectionHelper.setPermissionFunction(player, function)
-                }
+                profile = skinResolvedProfile ?: finalCandidateProfile
+                setConnectedPlayerGameProfile(player, profile)
 
-                server.eventManager.fire(LoginEvent(player, serverIdHash)).thenAcceptAsync({ loginEvent ->
+                server.eventManager.fire(
+                    PermissionsSetupEvent(player, NettyReflectionHelper.defaultPermissions())
+                ).thenComposeAsync({ event ->
                     if (mcConnection.isClosed) {
-                        server.eventManager.fireAndForget(
-                            DisconnectEvent(player, DisconnectEvent.LoginStatus.CANCELLED_BY_USER_BEFORE_COMPLETE),
+                        return@thenComposeAsync CompletableFuture.completedFuture(null)
+                    }
+
+                    val function: PermissionFunction? = event.createFunction(player)
+                    if (function == null) {
+                        logger.error(
+                            "A plugin permission provider {} provided an invalid permission function for player {}. Falling back to the default permission function.",
+                            event.provider.javaClass.name,
+                            player.username,
                         )
-                        return@thenAcceptAsync
+                    } else {
+                        NettyReflectionHelper.setPermissionFunction(player, function)
                     }
 
-                    val reason: Optional<Component> = loginEvent.result.reasonComponent
-                    if (reason.isPresent) {
-                        player.disconnect0(reason.get(), false)
-                        return@thenAcceptAsync
-                    }
+                    server.eventManager.fire(LoginEvent(player, serverIdHash)).thenAcceptAsync({ loginEvent ->
+                        if (mcConnection.isClosed) {
+                            server.eventManager.fireAndForget(
+                                DisconnectEvent(player, DisconnectEvent.LoginStatus.CANCELLED_BY_USER_BEFORE_COMPLETE),
+                            )
+                            return@thenAcceptAsync
+                        }
 
-                    if (!server.registerConnection(player)) {
-                        player.disconnect0(Component.translatable("velocity.error.already-connected-proxy"), false)
-                        return@thenAcceptAsync
-                    }
+                        val reason: Optional<Component> = loginEvent.result.reasonComponent
+                        if (reason.isPresent) {
+                            player.disconnect0(reason.get(), false)
+                            return@thenAcceptAsync
+                        }
 
-                    continueReleasedFlow(player, preferredTargetServerName)
+                        if (!server.registerConnection(player)) {
+                            player.disconnect0(Component.translatable("velocity.error.already-connected-proxy"), false)
+                            return@thenAcceptAsync
+                        }
+
+                        continueReleasedFlow(player, preferredTargetServerName)
+                    }, mcConnection.eventLoop())
                 }, mcConnection.eventLoop())
             }, mcConnection.eventLoop())
         }, mcConnection.eventLoop()).exceptionally { ex ->

@@ -48,6 +48,44 @@ internal fun buildAttachedIdentityGameProfile(
     return GameProfile(attachedProfile.uuid, attachedProfile.name, currentGameProfile.properties)
 }
 
+internal fun hasSemanticGameProfileDifference(expected: GameProfile, actual: GameProfile): Boolean {
+    if (expected.id != actual.id || expected.name != actual.name) {
+        return true
+    }
+
+    return normalizeGameProfileProperties(expected) != normalizeGameProfileProperties(actual)
+}
+
+internal fun describeGameProfileBrief(profile: GameProfile): String {
+    val propertyNames = profile.properties
+        .map { it.name }
+        .distinct()
+        .sorted()
+    return "id=${profile.id}, name=${profile.name}, propertyCount=${profile.properties.size}, propertyNames=$propertyNames"
+}
+
+private fun normalizeGameProfileProperties(profile: GameProfile): List<NormalizedGameProfileProperty> {
+    return profile.properties
+        .map { property ->
+            NormalizedGameProfileProperty(
+                name = property.name,
+                value = property.value,
+                signature = property.signature,
+            )
+        }
+        .sortedWith(
+            compareBy<NormalizedGameProfileProperty> { it.name }
+                .thenBy { it.value }
+                .thenBy { it.signature ?: "" }
+        )
+}
+
+private data class NormalizedGameProfileProperty(
+    val name: String,
+    val value: String,
+    val signature: String?,
+)
+
 internal fun setConnectedPlayerGameProfile(player: ConnectedPlayer, profile: GameProfile) {
     VelocityGameProfileReflection.profileField.set(player, profile)
 }
