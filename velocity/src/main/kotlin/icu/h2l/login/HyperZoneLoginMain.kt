@@ -50,7 +50,6 @@ import icu.h2l.login.database.DatabaseConfig
 import icu.h2l.login.database.DatabaseHelper
 import icu.h2l.login.inject.network.VelocityNetworkModule
 import icu.h2l.login.vServer.backend.BackendAuthHoldListener
-import icu.h2l.login.vServer.limbo.LimboVServerAuth
 import icu.h2l.login.vServer.outpre.OutPreVServerAuth
 import icu.h2l.login.vServer.command.ExitVServerCommand
 import icu.h2l.login.vServer.command.OverVServerCommand
@@ -170,52 +169,27 @@ class HyperZoneLoginMain(
 
         activeVServerAdapter = null
 
-        val configuredMode = backendServerConfig.vServerMode.trim().lowercase()
-        val limboPluginPresent = server.pluginManager.getPlugin("limboapi").isPresent
-        if (configuredMode == "limbo" || (configuredMode == "auto" && limboPluginPresent)) {
-            try {
-                val limbo = LimboVServerAuth(server)
-                limbo.load()
-                activeVServerAdapter = limbo
-                logger.info("Using Limbo waiting-area adapter")
-            } catch (t: Throwable) {
-                logger.error(
-                    "Limbo adapter initialization failed; falling back to other configured waiting-area modes if available",
-                    t
-                )
-            }
-        }
-
-        if (activeVServerAdapter == null) {
-            val configuredFallback = backendServerConfig.fallbackAuthServer.trim()
-            val configuredOutPreAuthAddress = outPreConfig.resolveAuthAddress()
-            if (configuredOutPreAuthAddress != null && configuredMode == "outpre") {
-                activeVServerAdapter = OutPreVServerAuth(server)
-                logger.info(
-                    "Using outpre waiting-area adapter on direct auth endpoint '{}' ({})",
-                    outPreConfig.authTargetLabel(),
-                    configuredOutPreAuthAddress,
-                )
-            } else if (configuredFallback.isNotBlank() && (configuredMode == "backend" || configuredMode == "auto")) {
-                activeVServerAdapter = BackendAuthHoldListener(server)
-                logger.info(
-                    if (limboPluginPresent) {
-                        "Limbo unavailable; using backend auth hold server '$configuredFallback'"
-                    } else {
-                        "Limbo not present; using backend auth hold server '$configuredFallback'"
-                    }
-                )
-            } else {
-                logger.info(
-                    if (configuredMode == "outpre") {
-                        "Outpre mode is enabled but outpre.conf authHost/authPort is invalid; running without waiting-area adapter"
-                    } else if (limboPluginPresent) {
-                        "Limbo unavailable; running without Limbo integration or backend auth hold"
-                    } else {
-                        "Limbo not present; running without Limbo integration or backend auth hold"
-                    }
-                )
-            }
+        val configuredMode = normalizeVServerMode(backendServerConfig.vServerMode)
+        val configuredFallback = backendServerConfig.fallbackAuthServer.trim()
+        val configuredOutPreAuthAddress = outPreConfig.resolveAuthAddress()
+        if (configuredOutPreAuthAddress != null && configuredMode == "outpre") {
+            activeVServerAdapter = OutPreVServerAuth(server)
+            logger.info(
+                "Using outpre waiting-area adapter on direct auth endpoint '{}' ({})",
+                outPreConfig.authTargetLabel(),
+                configuredOutPreAuthAddress,
+            )
+        } else if (configuredFallback.isNotBlank() && configuredMode == "backend") {
+            activeVServerAdapter = BackendAuthHoldListener(server)
+            logger.info("Using backend auth hold server '$configuredFallback'")
+        } else {
+            logger.info(
+                if (configuredMode == "outpre") {
+                    "Outpre mode is enabled but vserver-outpre.conf authHost/authPort is invalid; running without waiting-area adapter"
+                } else {
+                    "Backend mode is enabled but fallbackAuthServer is blank; running without waiting-area adapter"
+                }
+            )
         }
 
         HyperChatCommandManagerImpl.bindVServer(proxy, activeVServerAdapter)
@@ -331,14 +305,16 @@ class HyperZoneLoginMain(
             ?: messageService.send(player, MessageKeys.HzlCommand.AUTH_FLOW_UNAVAILABLE)
     }
 
-    @Deprecated("Use triggerVServerReJoinForPlayer(player) instead")
-    fun triggerVServerAuthForPlayer(player: com.velocitypowered.api.proxy.Player) {
-        triggerVServerReJoinForPlayer(player)
-    }
+    private fun normalizeVServerMode(rawMode: String): String {
+        return when (rawMode.trim().lowercase()) {
+            "", "auto", "limbo" -> {
+                logger.warn("vServerMode='{}' is deprecated after Limbo removal; falling back to 'backend'", rawMode)
+                "backend"
+            }
 
-    @Deprecated("Use triggerVServerReJoinForPlayer(player) instead")
-    fun triggerLimboAuthForPlayer(player: com.velocitypowered.api.proxy.Player) {
-        triggerVServerReJoinForPlayer(player)
+            "outpre" -> "outpre"
+            else -> "backend"
+        }
     }
 
     private fun logInternalTestWarning() {

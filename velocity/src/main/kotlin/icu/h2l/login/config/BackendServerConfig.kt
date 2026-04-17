@@ -26,8 +26,8 @@ import org.spongepowered.configurate.objectmapping.meta.Comment
 
 @ConfigSerializable
 class BackendServerConfig {
-    @Comment("等待区实现模式：auto / limbo / backend / outpre")
-    val vServerMode: String = "auto"
+    @Comment("等待区实现模式：backend / outpre")
+    val vServerMode: String = "backend"
 
     @Comment("backend 模式使用的真实认证等待服 Velocity 服务器名；留空表示禁用 backend 模式等待服")
     val fallbackAuthServer: String = "lobby"
