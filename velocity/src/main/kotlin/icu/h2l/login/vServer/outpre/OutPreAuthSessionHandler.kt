@@ -255,13 +255,7 @@ class OutPreAuthSessionHandler(
 
     private fun connectToReleasedTarget(player: ConnectedPlayer, preferredTargetServerName: String?): CompletableFuture<Void> {
         val preferredTarget = outPre.resolveReleaseTarget(player, preferredTargetServerName)
-        if (preferredTarget != null) {
-            player.createConnectionRequest(preferredTarget).fireAndForget()
-            return CompletableFuture.completedFuture(null)
-        }
-
-        val initialFromConfig = player.nextServerToTry.orElse(null)
-        val event = PlayerChooseInitialServerEvent(player, initialFromConfig)
+        val event = PlayerChooseInitialServerEvent(player, preferredTarget)
         return server.eventManager.fire(event).thenRunAsync({
             val toTry = event.initialServer.orElse(null)
             if (toTry == null) {

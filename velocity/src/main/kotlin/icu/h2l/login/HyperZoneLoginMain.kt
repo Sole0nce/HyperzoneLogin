@@ -44,6 +44,7 @@ import icu.h2l.login.config.DebugConfig
 import icu.h2l.login.config.MessagesConfig
 import icu.h2l.login.config.MiscConfig
 import icu.h2l.login.config.ModulesConfig
+import icu.h2l.login.config.OutPreConfig
 import icu.h2l.login.config.RemapConfig
 import icu.h2l.login.database.DatabaseConfig
 import icu.h2l.login.database.DatabaseHelper
@@ -113,6 +114,7 @@ class HyperZoneLoginMain(
         private lateinit var debugConfig: DebugConfig
         private lateinit var modulesConfig: ModulesConfig
         private lateinit var backendServerConfig: BackendServerConfig
+        private lateinit var outPreConfig: OutPreConfig
         private lateinit var messagesConfig: MessagesConfig
 
         @JvmStatic
@@ -131,6 +133,9 @@ class HyperZoneLoginMain(
         fun getBackendServerConfig(): BackendServerConfig = backendServerConfig
 
         @JvmStatic
+        fun getOutPreConfig(): OutPreConfig = outPreConfig
+
+        @JvmStatic
         fun getMessagesConfig(): MessagesConfig = messagesConfig
     }
 
@@ -147,6 +152,7 @@ class HyperZoneLoginMain(
         loadDebugConfig()
         loadModulesConfig()
         loadBackendServerConfig()
+        loadOutPreConfig()
         loadMessagesConfig()
         messageService = MessageService(dataDirectory, logger)
         messageService.load(messagesConfig)
@@ -182,9 +188,14 @@ class HyperZoneLoginMain(
 
         if (activeVServerAdapter == null) {
             val configuredFallback = backendServerConfig.fallbackAuthServer.trim()
-            if (configuredFallback.isNotBlank() && configuredMode == "outpre") {
+            val configuredOutPreAuthAddress = outPreConfig.resolveAuthAddress()
+            if (configuredOutPreAuthAddress != null && configuredMode == "outpre") {
                 activeVServerAdapter = OutPreVServerAuth(server)
-                logger.info("Using outpre waiting-area adapter on backend auth server '$configuredFallback'")
+                logger.info(
+                    "Using outpre waiting-area adapter on direct auth endpoint '{}' ({})",
+                    outPreConfig.authTargetLabel(),
+                    configuredOutPreAuthAddress,
+                )
             } else if (configuredFallback.isNotBlank() && (configuredMode == "backend" || configuredMode == "auto")) {
                 activeVServerAdapter = BackendAuthHoldListener(server)
                 logger.info(
@@ -197,7 +208,7 @@ class HyperZoneLoginMain(
             } else {
                 logger.info(
                     if (configuredMode == "outpre") {
-                        "Outpre mode is enabled but fallbackAuthServer is blank; running without waiting-area adapter"
+                        "Outpre mode is enabled but outpre.conf authHost/authPort is invalid; running without waiting-area adapter"
                     } else if (limboPluginPresent) {
                         "Limbo unavailable; running without Limbo integration or backend auth hold"
                     } else {
@@ -342,6 +353,7 @@ class HyperZoneLoginMain(
         loadDebugConfig()
         loadModulesConfig()
         loadBackendServerConfig()
+        loadOutPreConfig()
         loadMessagesConfig()
         if (::messageService.isInitialized) {
             messageService.load(messagesConfig)
@@ -632,6 +644,38 @@ class HyperZoneLoginMain(
         }
         if (config != null) {
             backendServerConfig = config
+        }
+    }
+
+    private fun loadOutPreConfig() {
+        val path = dataDirectory.resolve("vserver-outpre.conf")
+        val firstCreation = Files.notExists(path)
+        val loader = HoconConfigurationLoader.builder()
+            .defaultOptions { opts: ConfigurationOptions ->
+                opts
+                    .shouldCopyDefaults(true)
+                    .header(
+                        """
+                            HyperZoneLogin OutPre Configuration | by ksqeib
+                            outpre 模式的认证服、认证后目标服，以及对认证服暴露的 Host / Port / Player IP 都只在这里配置。
+
+                        """.trimIndent()
+                    ).serializers { s ->
+                        s.registerAnnotatedObjects(
+                            ObjectMapper.factoryBuilder().addDiscoverer(dataClassFieldDiscoverer()).build()
+                        )
+                    }
+            }
+            .path(path)
+            .build()
+        val node = loader.load()
+        val config = node.get(OutPreConfig::class.java)
+        if (firstCreation) {
+            node.set(config)
+            loader.save(node)
+        }
+        if (config != null) {
+            outPreConfig = config
         }
     }
 

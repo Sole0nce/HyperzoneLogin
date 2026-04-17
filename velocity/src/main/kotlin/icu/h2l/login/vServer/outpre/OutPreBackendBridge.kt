@@ -23,7 +23,6 @@ package icu.h2l.login.vServer.outpre
 
 import com.velocitypowered.api.network.HandshakeIntent
 import com.velocitypowered.api.network.ProtocolVersion
-import com.velocitypowered.api.proxy.server.RegisteredServer
 import com.velocitypowered.proxy.VelocityServer
 import com.velocitypowered.proxy.connection.MinecraftConnection
 import com.velocitypowered.proxy.connection.MinecraftConnectionAssociation
@@ -33,7 +32,7 @@ import com.velocitypowered.proxy.protocol.StateRegistry
 import com.velocitypowered.proxy.protocol.packet.HandshakePacket
 import com.velocitypowered.proxy.protocol.packet.ServerLoginPacket
 import com.velocitypowered.proxy.protocol.packet.config.FinishedUpdatePacket
-import com.velocitypowered.proxy.server.VelocityRegisteredServer
+import icu.h2l.login.HyperZoneLoginMain
 import io.netty.channel.ChannelFutureListener
 import java.net.InetSocketAddress
 import java.util.concurrent.CompletableFuture
@@ -41,7 +40,8 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 class OutPreBackendBridge(
     val proxyServer: VelocityServer,
-    val authServer: VelocityRegisteredServer,
+    private val authTargetLabel: String,
+    private val authTargetAddress: InetSocketAddress,
     val player: ConnectedPlayer,
     private val owner: OutPreVServerAuth,
 ) : MinecraftConnectionAssociation {
@@ -69,9 +69,9 @@ class OutPreBackendBridge(
     @Volatile
     private var phase = Phase.IDLE
 
-    fun targetServerName(): String = authServer.serverInfo.name
+    fun targetServerName(): String = authTargetLabel
 
-    fun targetAddress(): InetSocketAddress = authServer.serverInfo.address
+    fun targetAddress(): InetSocketAddress = authTargetAddress
 
     fun connect(): CompletableFuture<Void> {
         if (connectStarted) {
@@ -81,7 +81,7 @@ class OutPreBackendBridge(
         updatePhase(Phase.CONNECTING)
         proxyServer.createBootstrap(player.connection.eventLoop())
             .handler(proxyServer.backendChannelInitializer)
-            .connect(authServer.serverInfo.address)
+            .connect(authTargetAddress)
             .addListener(ChannelFutureListener { channelFuture ->
                 if (!channelFuture.isSuccess) {
                     fail(channelFuture.cause() ?: IllegalStateException("OutPre backend bootstrap failed"))
@@ -148,11 +148,13 @@ class OutPreBackendBridge(
 
     private fun startHandshake(connection: MinecraftConnection) {
         val protocolVersion: ProtocolVersion = player.protocolVersion
+        val outPreConfig = HyperZoneLoginMain.getOutPreConfig()
+        val targetAddress = targetAddress()
         val handshake = HandshakePacket()
         handshake.setIntent(HandshakeIntent.LOGIN)
         handshake.protocolVersion = protocolVersion
-        handshake.serverAddress = player.virtualHost.orElseGet(::targetAddress).hostString
-        handshake.port = player.virtualHost.orElseGet(::targetAddress).port
+        handshake.serverAddress = outPreConfig.resolvePresentedHost(targetAddress)
+        handshake.port = outPreConfig.resolvePresentedPort(targetAddress)
         connection.delayedWrite(handshake)
         connection.protocolVersion = protocolVersion
         connection.setActiveSessionHandler(StateRegistry.LOGIN)
@@ -221,7 +223,6 @@ class OutPreBackendBridge(
         updatePhase(Phase.CLOSED)
     }
 
-    fun registeredServer(): RegisteredServer = authServer
 
     private fun fail(throwable: Throwable, notifyOwner: Boolean = false) {
         updatePhase(Phase.CLOSING)

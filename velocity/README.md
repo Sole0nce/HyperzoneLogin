@@ -43,15 +43,19 @@ velocity / 主插件 (HyperZoneLogin 核心)
     - `limbo`：强制使用 Limbo；
     - `backend`：使用当前的后端等待服模式；
     - `outpre`：先挂起正常 Velocity 注册，把登录阶段连接桥接到真实认证服，认证完成后再继续正常初始服流程；
-  - 可在 `backend-server.conf` 中配置 `fallbackAuthServer` 为一个真实后端服务器名；
-  - 当未安装 `limboapi` 时，未认证玩家会被固定送入该服务器等待认证；
-  - `outpre` 额外支持桥接参数：
-    - `outPreAddressMode=virtual-host|backend-address|custom`
-    - `outPreAddressHost` / `outPreAddressPort`
-    - `outPrePlayerIpMode=client|proxy|custom`
-    - `outPrePlayerIpValue`
-  - 这些参数用于控制“认证服看到的 Host / Port / 玩家 IP”，方便对接需要固定入口地址或固定来源 IP 的认证后端；
-  - 可通过 `postAuthDefaultServer` 配置认证完成后优先进入的子服务器，默认 `play`；
+  - `backend-server.conf` 只负责 `backend` 模式配置：
+    - `fallbackAuthServer`
+    - `postAuthDefaultServer`
+    - `rememberRequestedServerDuringAuth`
+  - 当未安装 `limboapi` 且使用 `backend` 模式时，未认证玩家会被固定送入该服务器等待认证；
+  - `outpre` 改为使用独立的 `outpre.conf`：
+    - `authHost` / `authPort`：outpre 要直连桥接到的真实认证服；
+    - `authLabel`：仅用于日志/状态标识的逻辑名，不需要在 Velocity 中注册；
+    - `postAuthDefaultServer`：认证完成后默认进入的子服务器；
+    - `rememberRequestedServerDuringAuth`：是否记住玩家在认证阶段切换出来的目标服；
+    - `presentedHost` / `presentedPort` / `presentedPlayerIp`：转接到认证服时，对后端暴露的连接信息；
+  - 这些参数只由 `outpre.conf` 控制，不再与 `backend` 模式共享，也不再从 Velocity 的 `virtual host / forced hosts / attempt-connection-order` 推导；
+  - `outpre` 的认证服无需在 Velocity 中注册；只要配置好 `authHost/authPort` 即可进行直连桥接；
   - 认证完成前，玩家不能进入其他后端；
   - 若 `rememberRequestedServerDuringAuth=true`，则会记住玩家原本想去的服务器，并在认证成功后自动连接过去。
 

@@ -43,6 +43,7 @@ import icu.h2l.api.log.debug
 import icu.h2l.api.log.error
 import icu.h2l.api.player.HyperZonePlayer
 import icu.h2l.login.HyperZoneLoginMain
+import icu.h2l.login.config.OutPreConfig
 import icu.h2l.login.inject.network.ChatSessionUpdatePacketIdResolver
 import icu.h2l.login.manager.HyperZonePlayerManager
 import icu.h2l.login.player.ProfileSkinApplySupport
@@ -54,7 +55,6 @@ import io.netty.channel.ChannelOutboundHandlerAdapter
 import io.netty.channel.ChannelPromise
 import io.netty.util.ReferenceCountUtil
 import java.net.InetSocketAddress
-import java.util.function.Supplier
 
 class ToBackendPacketReplacer(
     private val channel: Channel
@@ -68,6 +68,7 @@ class ToBackendPacketReplacer(
     private lateinit var hyperPlayer: HyperZonePlayer
     private lateinit var targetServerName: String
     private lateinit var targetServerAddress: InetSocketAddress
+    private var outPreBridgeAssociation: Boolean = false
 
     private lateinit var config: VelocityConfiguration
 
@@ -131,7 +132,11 @@ class ToBackendPacketReplacer(
     }
 
     private fun isLoginServerTarget(): Boolean {
-        val loginServerName = HyperZoneLoginMain.getBackendServerConfig().fallbackAuthServer.trim()
+        if (outPreBridgeAssociation) {
+            return true
+        }
+
+        val loginServerName = configuredLoginServerName()
         if (loginServerName.isBlank()) {
             return false
         }
@@ -140,11 +145,15 @@ class ToBackendPacketReplacer(
     }
 
     private fun isOutPreAuthTarget(): Boolean {
-        if (!isLoginServerTarget()) {
-            return false
-        }
+        return outPreBridgeAssociation
+    }
 
-        return HyperZoneLoginMain.getBackendServerConfig().vServerMode.trim().equals("outpre", ignoreCase = true)
+    private fun configuredLoginServerName(): String {
+        return HyperZoneLoginMain.getBackendServerConfig().fallbackAuthServer.trim()
+    }
+
+    private fun outPreConfig(): OutPreConfig {
+        return HyperZoneLoginMain.getOutPreConfig()
     }
 
     private fun shouldRewriteHandshake(): Boolean {
@@ -208,22 +217,15 @@ class ToBackendPacketReplacer(
     private lateinit var fillAddr: InetSocketAddress
 
     private fun resolvePresentedHostAndPort(): Pair<String, Int> {
-        val defaultAddress = player.virtualHost.orElseGet(Supplier { fillAddr })
         if (!isOutPreAuthTarget()) {
-            return defaultAddress.hostString to defaultAddress.port
+            val virtualHost = player.virtualHost.orElse(null)
+            val host = virtualHost?.hostString ?: fillAddr.hostString
+            val port = virtualHost?.port ?: fillAddr.port
+            return host to port
         }
 
-        val cfg = HyperZoneLoginMain.getBackendServerConfig()
-        return when (cfg.outPreAddressMode.trim().lowercase()) {
-            "backend-address" -> fillAddr.hostString to fillAddr.port
-            "custom" -> {
-                val host = cfg.outPreAddressHost.trim().ifBlank { fillAddr.hostString }
-                val port = if (cfg.outPreAddressPort > 0) cfg.outPreAddressPort else fillAddr.port
-                host to port
-            }
-
-            else -> defaultAddress.hostString to defaultAddress.port
-        }
+        val cfg = outPreConfig()
+        return cfg.resolvePresentedHost(fillAddr) to cfg.resolvePresentedPort(fillAddr)
     }
 
     private fun genHandshake(): HandshakePacket {
@@ -297,16 +299,7 @@ class ToBackendPacketReplacer(
             return player.remoteAddress.address.hostAddress
         }
 
-        val cfg = HyperZoneLoginMain.getBackendServerConfig()
-        return when (cfg.outPrePlayerIpMode.trim().lowercase()) {
-            "proxy" -> (mcConnection.channel.localAddress() as? InetSocketAddress)
-                ?.address
-                ?.hostAddress
-                ?: player.remoteAddress.address.hostAddress
-
-            "custom" -> cfg.outPrePlayerIpValue.trim().ifBlank { player.remoteAddress.address.hostAddress }
-            else -> player.remoteAddress.address.hostAddress
-        }
+        return outPreConfig().resolvePresentedPlayerIp(player.remoteAddress.address.hostAddress)
     }
 
 
@@ -364,12 +357,14 @@ class ToBackendPacketReplacer(
         this.mcConnection = conn
         when (val association = conn.association) {
             is VelocityServerConnection -> {
+                this.outPreBridgeAssociation = false
                 this.player = association.player
                 this.targetServerName = association.server.serverInfo.name
                 this.targetServerAddress = association.server.serverInfo.address
             }
 
             is OutPreBackendBridge -> {
+                this.outPreBridgeAssociation = true
                 this.player = association.player
                 this.targetServerName = association.targetServerName()
                 this.targetServerAddress = association.targetAddress()

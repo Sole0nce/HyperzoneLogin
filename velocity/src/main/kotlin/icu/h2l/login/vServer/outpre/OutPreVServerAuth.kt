@@ -29,7 +29,6 @@ import com.velocitypowered.api.proxy.Player
 import com.velocitypowered.api.proxy.ProxyServer
 import com.velocitypowered.api.proxy.server.RegisteredServer
 import com.velocitypowered.proxy.connection.client.ConnectedPlayer
-import com.velocitypowered.proxy.server.VelocityRegisteredServer
 import icu.h2l.api.event.area.PlayerAreaTransitionReason
 import icu.h2l.api.event.vServer.VServerAuthStartEvent
 import icu.h2l.api.event.vServer.VServerJoinEvent
@@ -43,7 +42,6 @@ import icu.h2l.login.message.MessageKeys
 import icu.h2l.login.player.VelocityHyperZonePlayer
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.format.NamedTextColor
-import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -54,7 +52,7 @@ class OutPreVServerAuth(
     private val server: ProxyServer,
 ) : HyperZoneVServerAdapter {
     private data class OutPreState(
-        var authServerName: String,
+        var authTargetLabel: String,
         var returnTargetServerName: String? = null,
         var inAuthHold: Boolean = true,
         var hasConnectedToAuthServerOnce: Boolean = false,
@@ -69,16 +67,16 @@ class OutPreVServerAuth(
     private val initialBridges = ConcurrentHashMap<io.netty.channel.Channel, OutPreBackendBridge>()
 
     override fun isEnabled(): Boolean {
-        return configuredAuthServerName().isNotBlank()
+        return configuredAuthAddress() != null
     }
 
     fun createBridge(player: ConnectedPlayer): OutPreBackendBridge {
         initialBridges[player.getChannel()]?.let { return it }
-        val authServer = resolveAuthServer()
-            ?: throw IllegalStateException("OutPre auth server is not configured")
+        val authAddress = configuredAuthAddress()
+            ?: throw IllegalStateException("OutPre auth endpoint is not configured")
         val proxy = server as? com.velocitypowered.proxy.VelocityServer
             ?: throw IllegalStateException("OutPre requires VelocityServer runtime")
-        return OutPreBackendBridge(proxy, authServer, player, this).also {
+        return OutPreBackendBridge(proxy, configuredAuthTargetLabel(), authAddress, player, this).also {
             initialBridges[player.getChannel()] = it
         }
     }
@@ -93,7 +91,7 @@ class OutPreVServerAuth(
             logger.debug("outpre 绑定代理玩家跳过: ${throwable.message}")
         }
 
-        val authServer = resolveAuthServer() ?: run {
+        if (configuredAuthAddress() == null) {
             player.disconnect(messages.render(player, MessageKeys.BackendAuth.MISCONFIGURED_DISCONNECT))
             return
         }
@@ -106,7 +104,7 @@ class OutPreVServerAuth(
         }
 
         val state = OutPreState(
-            authServerName = authServer.serverInfo.name,
+            authTargetLabel = configuredAuthTargetLabel(),
             initialFlowPending = true,
         )
         states[player.getChannel()] = state
@@ -125,80 +123,39 @@ class OutPreVServerAuth(
     }
 
     fun resolveReleaseTarget(player: ConnectedPlayer, preferredTargetServerName: String?): RegisteredServer? {
-        val authServerName = states[player.getChannel()]?.authServerName ?: configuredAuthServerName()
+        val authTargetLabel = states[player.getChannel()]?.authTargetLabel ?: configuredAuthTargetLabel()
         val resolvedTargetName = preferredTargetServerName
-            ?.takeUnless { it.isBlank() || it.equals(authServerName, ignoreCase = true) }
+            ?.takeUnless { it.isBlank() || it.equals(authTargetLabel, ignoreCase = true) }
             ?.takeIf { server.getServer(it).isPresent }
-            ?: resolveFallbackTargetServerName(player, authServerName)
+            ?: resolveFallbackTargetServerName(authTargetLabel)
         return resolvedTargetName?.let { server.getServer(it).orElse(null) }
     }
 
     override fun reJoin(player: Player) {
         val messages = HyperZoneLoginMain.getInstance().messageService
         val hyperPlayer = getHyperPlayer(player) ?: return
-        val authServer = resolveAuthServer() ?: run {
+        if (configuredAuthAddress() == null) {
             player.sendMessage(messages.render(player, MessageKeys.BackendAuth.NO_AUTH_SERVER))
             return
         }
 
-        val preferredTarget = player.currentServer
-            .map { it.server.serverInfo.name }
-            .orElse(null)
-            ?.takeUnless { it.equals(authServer.serverInfo.name, ignoreCase = true) }
-
-        val state = OutPreState(
-            authServerName = authServer.serverInfo.name,
-            returnTargetServerName = preferredTarget,
-            initialFlowPending = false,
-        )
-        states[player.getChannel()] = state
-
         val authStartEvent = VServerAuthStartEvent(player, hyperPlayer)
         server.eventManager.fire(authStartEvent).join()
         if (authStartEvent.pass) {
-            state.inAuthHold = false
-            connectVerifiedPlayerToTarget(player, state)
             return
         }
 
-        hyperPlayer.suspendMessageDelivery()
-        if (preferredTarget.equals(authServer.serverInfo.name, ignoreCase = true)) {
-            onAuthServerJoined(player, hyperPlayer, state)
-            return
-        }
-
-        player.createConnectionRequest(authServer).connect().whenComplete { result, throwable ->
-            if (throwable != null) {
-                hyperPlayer.resumeMessageDelivery()
-                player.sendMessage(
-                    messages.render(
-                        player,
-                        MessageKeys.BackendAuth.ENTER_FAILED_EXCEPTION,
-                        HyperZoneMessagePlaceholder.text("reason", throwable.message ?: "Unknown error"),
-                    )
-                )
-                return@whenComplete
-            }
-
-            if (result == null || !result.isSuccessful) {
-                hyperPlayer.resumeMessageDelivery()
-                val reason = result.reasonComponent?.map { it.toString() }?.orElse("未知原因") ?: "未知原因"
-                player.sendMessage(
-                    messages.render(
-                        player,
-                        MessageKeys.BackendAuth.ENTER_FAILED_REASON,
-                        HyperZoneMessagePlaceholder.text("reason", reason),
-                    )
-                )
-            }
-        }
+        logger.warn("OutPre reJoin is not available for direct auth endpoint mode: player={}", player.username)
+        player.sendMessage(messages.render(player, MessageKeys.HzlCommand.AUTH_FLOW_UNAVAILABLE))
     }
 
     override fun isPlayerInWaitingArea(player: Player): Boolean {
         val state = states[player.getChannel()]
-        return isOnAuthServer(player, state?.authServerName ?: configuredAuthServerName()) ||
-            state?.hasConnectedToAuthServerOnce == false ||
-            state?.initialFlowPending == true
+        return state != null && (
+            state.inAuthHold ||
+                !state.hasConnectedToAuthServerOnce ||
+                state.initialFlowPending
+            )
     }
 
     override fun supportsProxyFallbackCommands(): Boolean {
@@ -206,7 +163,7 @@ class OutPreVServerAuth(
     }
 
     override fun canUseProxyFallbackCommand(player: Player): Boolean {
-        return isOnAuthServer(player)
+        return states.containsKey(player.getChannel())
     }
 
     override fun exitWaitingArea(player: Player): Boolean {
@@ -216,15 +173,11 @@ class OutPreVServerAuth(
             return true
         }
 
-        if (!isOnAuthServer(player, state.authServerName)) {
-            return false
-        }
-
         PlayerAreaLifecycleListener.markWaitingAreaLeavePending(player, PlayerAreaTransitionReason.EXIT_REQUEST)
         return connectPlayerToTarget(
             player = player,
             targetServerName = state.returnTargetServerName,
-            authServerName = state.authServerName,
+            authServerName = state.authTargetLabel,
             missingTargetKey = MessageKeys.BackendAuth.EXIT_NO_TARGET,
             missingServerKey = MessageKeys.BackendAuth.EXIT_SERVER_MISSING,
             failureExceptionKey = MessageKeys.BackendAuth.EXIT_FAILURE_EXCEPTION,
@@ -261,44 +214,23 @@ class OutPreVServerAuth(
         val state = states[player.getChannel()] ?: return
         if (!needsAuthServerProtection(state)) return
 
-        val authServer = resolveAuthServer() ?: run {
-            player.disconnect(messages.render(player, MessageKeys.BackendAuth.UNAVAILABLE_DISCONNECT))
-            return
-        }
-
         val requestedServerName = event.originalServer.serverInfo.name
-        val authServerName = authServer.serverInfo.name
-        if (requestedServerName.equals(authServerName, ignoreCase = true)) {
-            event.result = ServerPreConnectEvent.ServerResult.allowed(authServer)
-            return
-        }
-
         if (rememberRequestedServerDuringAuth()) {
             state.returnTargetServerName = requestedServerName
         }
 
         player.sendMessage(messages.render(player, MessageKeys.BackendAuth.MUST_VERIFY_BEFORE_TRANSFER))
-        event.result = if (event.previousServer == null) {
-            ServerPreConnectEvent.ServerResult.allowed(authServer)
-        } else {
-            ServerPreConnectEvent.ServerResult.denied()
-        }
+        event.result = ServerPreConnectEvent.ServerResult.denied()
     }
 
     @Subscribe
     fun onServerConnected(event: ServerPostConnectEvent) {
         val player = event.player
-        val hyperPlayer = getHyperPlayer(player) ?: return
         val state = states[player.getChannel()] ?: return
-        val currentServerName = player.currentServer.get().serverInfo.name
-        if (!currentServerName.equals(state.authServerName, ignoreCase = true)) {
-            if (!state.inAuthHold && !state.initialFlowPending) {
-                states.remove(player.getChannel(), state)
-                pendingInitialHandlers.remove(player.getChannel())
-            }
-            return
+        if (!state.inAuthHold && !state.initialFlowPending) {
+            states.remove(player.getChannel(), state)
+            pendingInitialHandlers.remove(player.getChannel())
         }
-        onAuthServerJoined(player, hyperPlayer, state)
     }
 
     @Subscribe
@@ -385,7 +317,7 @@ class OutPreVServerAuth(
         return connectPlayerToTarget(
             player = player,
             targetServerName = state.returnTargetServerName,
-            authServerName = state.authServerName,
+            authServerName = state.authTargetLabel,
             missingTargetKey = MessageKeys.BackendAuth.VERIFIED_NO_TARGET,
             missingServerKey = MessageKeys.BackendAuth.VERIFIED_SERVER_MISSING,
             failureExceptionKey = MessageKeys.BackendAuth.VERIFIED_FAILURE_EXCEPTION,
@@ -405,7 +337,7 @@ class OutPreVServerAuth(
         val messages = HyperZoneLoginMain.getInstance().messageService
         val resolvedTarget = targetServerName
             ?.takeUnless { it.isBlank() || it.equals(authServerName, ignoreCase = true) }
-            ?: resolveFallbackTargetServerName(player, authServerName)
+            ?: resolveFallbackTargetServerName(authServerName)
         val hyperPlayer = getHyperPlayer(player)
 
         if (resolvedTarget == null) {
@@ -468,28 +400,20 @@ class OutPreVServerAuth(
         return HyperZonePlayerManager.getByPlayerOrNull(player)
     }
 
-    private fun configuredAuthServerName(): String {
-        return HyperZoneLoginMain.getBackendServerConfig().fallbackAuthServer.trim()
+    private fun configuredAuthAddress(): java.net.InetSocketAddress? {
+        return HyperZoneLoginMain.getOutPreConfig().resolveAuthAddress()
+    }
+
+    private fun configuredAuthTargetLabel(): String {
+        return HyperZoneLoginMain.getOutPreConfig().authTargetLabel()
     }
 
     private fun rememberRequestedServerDuringAuth(): Boolean {
-        return HyperZoneLoginMain.getBackendServerConfig().rememberRequestedServerDuringAuth
+        return HyperZoneLoginMain.getOutPreConfig().rememberRequestedServerDuringAuth
     }
 
-    private fun isOnAuthServer(player: Player, authServerName: String = configuredAuthServerName()): Boolean {
-        if (authServerName.isBlank()) {
-            return false
-        }
-
-        val currentServerName = player.currentServer
-            .map { it.server.serverInfo.name }
-            .orElse(null)
-            ?: return false
-        return currentServerName.equals(authServerName, ignoreCase = true)
-    }
-
-    private fun resolveFallbackTargetServerName(player: Player, authServerName: String): String? {
-        val directConfiguredTarget = HyperZoneLoginMain.getBackendServerConfig().postAuthDefaultServer
+    private fun resolveFallbackTargetServerName(authServerName: String): String? {
+        val directConfiguredTarget = HyperZoneLoginMain.getOutPreConfig().postAuthDefaultServer
             .trim()
             .takeUnless { it.isBlank() || it.equals(authServerName, ignoreCase = true) }
             ?.takeIf { server.getServer(it).isPresent }
@@ -497,33 +421,7 @@ class OutPreVServerAuth(
             return directConfiguredTarget
         }
 
-        val config = server.configuration
-        val hostKey = player.virtualHost
-            .map { it.hostString.lowercase(Locale.ROOT) }
-            .orElse("")
-        val forcedOrder = config.forcedHosts[hostKey].orEmpty()
-        val connectionOrder = if (forcedOrder.isNotEmpty()) forcedOrder else config.attemptConnectionOrder
-
-        connectionOrder.firstOrNull { candidate ->
-            !candidate.equals(authServerName, ignoreCase = true) && server.getServer(candidate).isPresent
-        }?.let { return it }
-
-        return server.getAllServers()
-            .firstOrNull { candidate -> !candidate.serverInfo.name.equals(authServerName, ignoreCase = true) }
-            ?.serverInfo
-            ?.name
+        return null
     }
 
-    private fun resolveAuthServer(): VelocityRegisteredServer? {
-        val serverName = configuredAuthServerName()
-        if (serverName.isBlank()) {
-            return null
-        }
-
-        val resolved = server.getServer(serverName).orElseGet {
-            logger.warn("OutPre auth server '{}' is configured but was not found in Velocity", serverName)
-            null
-        }
-        return resolved as? VelocityRegisteredServer
-    }
 }
