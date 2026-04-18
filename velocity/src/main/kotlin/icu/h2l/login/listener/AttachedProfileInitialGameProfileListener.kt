@@ -19,32 +19,40 @@
  *
  */
 
-package icu.h2l.login.vServer.outpre.listener
+package icu.h2l.login.listener
 
 import com.velocitypowered.api.event.Subscribe
 import icu.h2l.api.connection.getNettyChannel
 import icu.h2l.api.event.profile.VerifyInitialGameProfileEvent
 import icu.h2l.login.HyperZoneLoginMain
-import icu.h2l.login.vServer.outpre.OutPreVServerAuth
+import icu.h2l.login.manager.HyperZonePlayerManager
+import icu.h2l.login.util.buildAttachedIdentityGameProfile
+import icu.h2l.login.util.hasSemanticGameProfileDifference
 
 /**
- * outpre 模式在真正交付给 Velocity 之前，会自行桥接并维护初始登录态。
- *
- * 因此这里需要显式豁免核心的 remap 前缀/UUID 校验，
- * 避免 `LoginVerifyListener` 把 outpre 的原始客户端档案误判为插件冲突。
+ * 当当前登录态已经 attach 正式档案时，
+ * 核心应允许与该正式档案语义一致的初始 GameProfile 通过校验。
  */
-class OutPreVerifyInitialGameProfileListener {
+class AttachedProfileInitialGameProfileListener {
     @Subscribe
     fun onVerifyInitialGameProfileEvent(event: VerifyInitialGameProfileEvent) {
-        val outPreAdapter = HyperZoneLoginMain.getInstance().serverAdapter as? OutPreVServerAuth
-            ?: return
         val channel = event.connection.getNettyChannel()
-        if (!outPreAdapter.shouldPassInitialVerifyProfile(channel, event.gameProfile)) {
+        val hyperPlayer = HyperZonePlayerManager.getByChannelOrNull(channel)
+            ?: return
+        val attachedProfile = HyperZoneLoginMain.getInstance().profileService.getAttachedProfile(hyperPlayer)
+            ?: return
+        val expectedProfile = buildAttachedIdentityGameProfile(
+            currentGameProfile = event.gameProfile,
+            attachedProfile = attachedProfile,
+        )
+        if (hasSemanticGameProfileDifference(expectedProfile, event.gameProfile)) {
             return
         }
 
         event.pass = true
     }
 }
+
+
 
 

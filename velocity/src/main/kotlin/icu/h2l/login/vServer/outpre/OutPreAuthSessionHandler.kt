@@ -200,10 +200,8 @@ class OutPreAuthSessionHandler(
             attachedProfile = attachedProfile,
         )
 
-        outPre.expectInitialVerifyProfile(player, finalCandidateProfile)
         val finalProfileEvent = GameProfileRequestEvent(inbound, finalCandidateProfile, onlineMode)
         server.eventManager.fire(finalProfileEvent).thenComposeAsync({ profileEvent ->
-            outPre.clearExpectedInitialVerifyProfile(player)
             if (mcConnection.isClosed) {
                 return@thenComposeAsync CompletableFuture.completedFuture(null)
             }
@@ -267,7 +265,6 @@ class OutPreAuthSessionHandler(
                 }, mcConnection.eventLoop())
             }, mcConnection.eventLoop())
         }, mcConnection.eventLoop()).exceptionally { ex ->
-            outPre.clearExpectedInitialVerifyProfile(player)
             logger.error("Exception while finalizing outpre flow for {}", player, ex)
             player.disconnect0(Component.text("OutPre finalization failed", NamedTextColor.RED), false)
             null
