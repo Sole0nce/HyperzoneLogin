@@ -21,7 +21,7 @@
 
 package icu.h2l.login.auth.offline.util.uuid
 
-import icu.h2l.login.auth.offline.config.OfflineMatchConfigLoader
+import icu.h2l.login.auth.offline.config.AuthOfflineConfigLoader
 import icu.h2l.login.auth.offline.util.ExtraUuidUtils
 import java.util.*
 
@@ -137,7 +137,7 @@ object PCL2UUIDUtil {
     }
 
     fun isPCL2UUID(uuid: UUID, name: String, hashMatch: Boolean = true, slimMatch: Boolean = true): Boolean {
-        val cfg = OfflineMatchConfigLoader.getConfig()
+        val cfg = AuthOfflineConfigLoader.getConfig().match
         val hashEnabled = cfg.uuidMatch.pcl2.hash && hashMatch
         val slimEnabled = cfg.uuidMatch.pcl2.slim && slimMatch
         if (!hashEnabled) return hasPCL2Info(uuid, name)

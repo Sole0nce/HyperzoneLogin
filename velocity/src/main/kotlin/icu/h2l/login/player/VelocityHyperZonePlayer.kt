@@ -156,7 +156,7 @@ class VelocityHyperZonePlayer(
     }
 
     override fun overVerify() {
-        if (HyperZoneLoginMain.getDebugConfig().slowTest.enabled && !coreAuthorizedOverVerify.get()) {
+        if (HyperZoneLoginMain.getCoreConfig().debug.slowTest.enabled && !coreAuthorizedOverVerify.get()) {
             sendMessage(HyperZoneLoginMain.getInstance().messageService.render(this, MessageKeys.Over.BLOCKED_BY_SLOW_TEST))
             return
         }
@@ -210,7 +210,7 @@ class VelocityHyperZonePlayer(
     }
 
     override fun getAttachedGameProfile(): GameProfile {
-        if (!HyperZoneLoginMain.getMiscConfig().enableReplaceGameProfile) {
+        if (!HyperZoneLoginMain.getCoreConfig().misc.enableReplaceGameProfile) {
 //            不开就可以从玩家获取
             return proxyPlayer!!.gameProfile
         }

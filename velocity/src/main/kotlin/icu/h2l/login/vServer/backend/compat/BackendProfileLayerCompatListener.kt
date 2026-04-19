@@ -64,7 +64,7 @@ class BackendProfileLayerCompatListener {
     }
 
     private fun isEnabled(): Boolean {
-        return HyperZoneLoginMain.getMiscConfig().enableReplaceGameProfile
+        return HyperZoneLoginMain.getCoreConfig().misc.enableReplaceGameProfile
                 && HyperZoneLoginMain.getInstance().serverAdapter?.needsBackendInitialProfileCompat() == true
     }
 }

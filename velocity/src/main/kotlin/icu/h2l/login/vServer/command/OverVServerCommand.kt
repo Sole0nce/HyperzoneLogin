@@ -38,7 +38,7 @@ class OverVServerCommand : HyperChatCommandExecutor {
             return
         }
 
-        if (!HyperZoneLoginMain.getDebugConfig().slowTest.enabled) {
+        if (!HyperZoneLoginMain.getCoreConfig().debug.slowTest.enabled) {
             messages.send(source, MessageKeys.Over.DISABLED)
             return
         }

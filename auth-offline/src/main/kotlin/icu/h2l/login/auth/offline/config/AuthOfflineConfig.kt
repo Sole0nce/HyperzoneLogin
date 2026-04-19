@@ -21,21 +21,16 @@
 
 package icu.h2l.login.auth.offline.config
 
-import icu.h2l.api.util.ConfigLoader
-import java.nio.file.Path
+import org.spongepowered.configurate.objectmapping.ConfigSerializable
+import org.spongepowered.configurate.objectmapping.meta.Comment
 
-object OfflineAuthConfigLoader {
-    private lateinit var config: OfflineAuthConfig
+@Suppress("ANNOTATION_WILL_BE_APPLIED_ALSO_TO_PROPERTY_OR_FIELD")
+@ConfigSerializable
+data class AuthOfflineConfig(
+    @Comment("离线认证主要设置 (原来的main块)")
+    val main: OfflineAuthConfig = OfflineAuthConfig(),
 
-    fun load(dataDirectory: Path) {
-        config = ConfigLoader.loadConfig(
-            dataDirectory = dataDirectory,
-            fileName = "auth-offline.conf",
-            nodePath = arrayOf("main"),
-            header = "HyperZoneLogin Offline Auth Configuration\nThis file contains all offline auth module settings.\n",
-            defaultProvider = { OfflineAuthConfig() }
-        )
-    }
+    @Comment("玩家正离线形态匹配设置 (原来的match块)")
+    val match: OfflineMatchConfig = OfflineMatchConfig()
+)
 
-    fun getConfig(): OfflineAuthConfig = config
-}

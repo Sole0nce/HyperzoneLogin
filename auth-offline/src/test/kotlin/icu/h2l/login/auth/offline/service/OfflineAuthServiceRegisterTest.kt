@@ -31,7 +31,7 @@ import icu.h2l.api.player.HyperZonePlayerAccessor
 import icu.h2l.api.profile.HyperZoneProfileService
 import icu.h2l.login.auth.offline.OfflineAuthMessages
 import icu.h2l.login.auth.offline.api.db.OfflineAuthTable
-import icu.h2l.login.auth.offline.config.OfflineAuthConfigLoader
+import icu.h2l.login.auth.offline.config.AuthOfflineConfigLoader
 import icu.h2l.login.auth.offline.db.OfflineAuthRepository
 import icu.h2l.login.auth.offline.mail.OfflineAuthEmailSender
 import icu.h2l.login.auth.offline.totp.OfflineTotpAuthenticator
@@ -65,8 +65,8 @@ class OfflineAuthServiceRegisterTest {
 
     @BeforeEach
     fun setUp() {
-        OfflineAuthConfigLoader.load(tempDir)
-        OfflineAuthConfigLoader.getConfig().passOfflineUuidToProfileResolve = false
+        AuthOfflineConfigLoader.load(tempDir)
+        AuthOfflineConfigLoader.getConfig().main.passOfflineUuidToProfileResolve = false
 
         database = Database.connect(
             url = "jdbc:h2:mem:${UUID.randomUUID()};MODE=MySQL;DB_CLOSE_DELAY=-1",
@@ -330,7 +330,7 @@ class OfflineAuthServiceRegisterTest {
     }
 
     private fun enableOfflineUuidPassthrough() {
-        OfflineAuthConfigLoader.getConfig().passOfflineUuidToProfileResolve = true
+        AuthOfflineConfigLoader.getConfig().main.passOfflineUuidToProfileResolve = true
     }
 
     private object NoopEmailSender : OfflineAuthEmailSender {

@@ -74,7 +74,7 @@ class LoginProfilePacketReplacer(
     private lateinit var config: VelocityConfiguration
 
     private fun replaceMessage(msg: Any?): Any? {
-        if (!HyperZoneLoginMain.getMiscConfig().enableReplaceGameProfile) {
+        if (!HyperZoneLoginMain.getCoreConfig().misc.enableReplaceGameProfile) {
             if (msg is LoginPluginResponsePacket) {
                 retire()
             }
@@ -96,7 +96,7 @@ class LoginProfilePacketReplacer(
     }
 
     private fun isLoginServerTarget(): Boolean {
-        val loginServerName = HyperZoneLoginMain.getVServerConfig().backend.fallbackAuthServer.trim()
+        val loginServerName = HyperZoneLoginMain.getCoreConfig().vServer.backend.fallbackAuthServer.trim()
         if (loginServerName.isBlank()) {
             return false
         }

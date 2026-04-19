@@ -24,18 +24,19 @@ package icu.h2l.login.auth.offline.config
 import icu.h2l.api.util.ConfigLoader
 import java.nio.file.Path
 
-object OfflineMatchConfigLoader {
-        private lateinit var config: OfflineMatchConfig
+object AuthOfflineConfigLoader {
+    private lateinit var config: AuthOfflineConfig
 
-        fun load(dataDirectory: Path) {
-                config = ConfigLoader.loadConfig(
-                        dataDirectory = dataDirectory,
-                        fileName = "auth-offline.conf",
-                        nodePath = arrayOf("match"),
-                        header = "HyperZoneLogin Offline Match Configuration\n",
-                        defaultProvider = { OfflineMatchConfig() }
-                )
-        }
+    fun load(dataDirectory: Path) {
+        config = ConfigLoader.loadConfig(
+            dataDirectory = dataDirectory,
+            fileName = "auth-offline.conf",
+            nodePath = emptyArray(),
+            header = "HyperZoneLogin Offline Module Configuration | by ksqeib\nThis file contains all offline auth module settings.\n",
+            defaultProvider = { AuthOfflineConfig() }
+        )
+    }
 
-        fun getConfig(): OfflineMatchConfig = config
+    fun getConfig(): AuthOfflineConfig = config
 }
+

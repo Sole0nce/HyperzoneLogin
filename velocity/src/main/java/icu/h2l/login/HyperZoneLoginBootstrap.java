@@ -113,7 +113,7 @@ public final class HyperZoneLoginBootstrap implements HyperZoneApi {
 
     @Override
     public boolean isGameProfileReplacementEnabled() {
-        return HyperZoneLoginMain.getMiscConfig().getEnableReplaceGameProfile();
+        return HyperZoneLoginMain.getCoreConfig().misc.getEnableReplaceGameProfile();
     }
 
     @Override

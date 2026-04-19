@@ -21,7 +21,7 @@
 
 package icu.h2l.login.auth.offline.util
 
-import icu.h2l.login.auth.offline.config.OfflineMatchConfigLoader
+import icu.h2l.login.auth.offline.config.AuthOfflineConfigLoader
 import icu.h2l.login.auth.offline.type.OfflineUUIDType
 import icu.h2l.login.auth.offline.util.uuid.PCL2UUIDUtil
 import java.nio.charset.StandardCharsets
@@ -35,7 +35,7 @@ object ExtraUuidUtils {
             return OfflineUUIDType.ZERO
         }
 
-        val cfg = OfflineMatchConfigLoader.getConfig()
+        val cfg = AuthOfflineConfigLoader.getConfig().match
         return when {
             cfg.uuidMatch.offline && holderUUID == getNormalOfflineUUID(name) -> OfflineUUIDType.OFFLINE
             cfg.uuidMatch.pcl2.enable && PCL2UUIDUtil.isPCL2UUID(holderUUID, name) -> OfflineUUIDType.PCL

@@ -95,32 +95,13 @@ class HyperZoneLoginMain(
 
     companion object {
         private lateinit var instance: HyperZoneLoginMain
-        private lateinit var databaseSourceConfig: DatabaseSourceConfig
-        private lateinit var remapConfig: RemapConfig
-        private lateinit var miscConfig: MiscConfig
-        private lateinit var debugConfig: DebugConfig
-        private lateinit var modulesConfig: ModulesConfig
-                        private lateinit var vServerConfig: VServerConfig
-        private lateinit var messagesConfig: MessagesConfig
+        private lateinit var coreConfig: CoreConfig
+        @JvmStatic
+        fun getCoreConfig(): CoreConfig = coreConfig
 
         @JvmStatic
         fun getInstance(): HyperZoneLoginMain = instance
 
-        @JvmStatic
-        fun getRemapConfig(): RemapConfig = remapConfig
-
-        @JvmStatic
-        fun getMiscConfig(): MiscConfig = miscConfig
-
-        @JvmStatic
-        fun getDebugConfig(): DebugConfig = debugConfig
-
-
-        @JvmStatic
-        fun getVServerConfig(): VServerConfig = vServerConfig
-
-        @JvmStatic
-        fun getMessagesConfig(): MessagesConfig = messagesConfig
     }
 
     init {
@@ -130,15 +111,9 @@ class HyperZoneLoginMain(
     @Suppress("unused", "UNUSED_PARAMETER")
     fun onEnable(event: ProxyInitializeEvent) {
         registerApiLogger()
-        loadDatabaseConfig()
-        loadRemapConfig()
-        loadMiscConfig()
-        loadDebugConfig()
-        loadModulesConfig()
-        loadVServerConfig()
-        loadMessagesConfig()
+        loadCoreConfig()
         messageService = MessageService(dataDirectory, logger)
-        messageService.load(messagesConfig)
+        messageService.load(coreConfig.messages)
         HyperZoneMessageServiceProvider.bind(messageService)
         connectDatabase()
         // 创建基础表（Profile 表等）
@@ -153,14 +128,14 @@ class HyperZoneLoginMain(
 
         activeVServerAdapter = null
 
-        val configuredMode = normalizeVServerMode(vServerConfig.mode)
-        val configuredFallback = vServerConfig.backend.fallbackAuthServer.trim()
-        val configuredOutPreAuthAddress = vServerConfig.outpre.resolveOutpreAuthAddress()
+        val configuredMode = normalizeVServerMode(coreConfig.vServer.mode)
+        val configuredFallback = coreConfig.vServer.backend.fallbackAuthServer.trim()
+        val configuredOutPreAuthAddress = coreConfig.vServer.outpre.resolveOutpreAuthAddress()
         if (configuredOutPreAuthAddress != null && configuredMode == "outpre") {
             activeVServerAdapter = OutPreVServerAuth(server)
             logger.info(
                 "Using outpre waiting-area adapter on direct auth endpoint '{}' ({})",
-                vServerConfig.outpre.outpreAuthTargetLabel(),
+                coreConfig.vServer.outpre.outpreAuthTargetLabel(),
                 configuredOutPreAuthAddress,
             )
         } else if (configuredFallback.isNotBlank() && configuredMode == "backend") {
@@ -241,12 +216,12 @@ class HyperZoneLoginMain(
     }
 
     private fun registerConfiguredEmbeddedModules() {
-        registerEmbeddedModule(EmbeddedModuleRegistry.authFloodgate, modulesConfig.authFloodgate)
-        registerEmbeddedModule(EmbeddedModuleRegistry.authOffline, modulesConfig.authOffline)
-        registerEmbeddedModule(EmbeddedModuleRegistry.authYggd, modulesConfig.authYggd)
-        registerEmbeddedModule(EmbeddedModuleRegistry.safe, modulesConfig.safe)
-        registerEmbeddedModule(EmbeddedModuleRegistry.profileSkin, modulesConfig.profileSkin)
-        registerEmbeddedModule(EmbeddedModuleRegistry.dataMerge, modulesConfig.dataMerge)
+        registerEmbeddedModule(EmbeddedModuleRegistry.authFloodgate, coreConfig.modules.authFloodgate)
+        registerEmbeddedModule(EmbeddedModuleRegistry.authOffline, coreConfig.modules.authOffline)
+        registerEmbeddedModule(EmbeddedModuleRegistry.authYggd, coreConfig.modules.authYggd)
+        registerEmbeddedModule(EmbeddedModuleRegistry.safe, coreConfig.modules.safe)
+        registerEmbeddedModule(EmbeddedModuleRegistry.profileSkin, coreConfig.modules.profileSkin)
+        registerEmbeddedModule(EmbeddedModuleRegistry.dataMerge, coreConfig.modules.dataMerge)
     }
 
     private fun registerEmbeddedModule(spec: EmbeddedModuleSpec, enabled: Boolean) {
@@ -312,20 +287,15 @@ class HyperZoneLoginMain(
     }
 
     fun reloadRuntimeConfigs() {
-        loadRemapConfig()
-        loadMiscConfig()
-        loadDebugConfig()
-        loadModulesConfig()
-        loadVServerConfig()
-        loadMessagesConfig()
+        loadCoreConfig()
         if (::messageService.isInitialized) {
-            messageService.load(messagesConfig)
+            messageService.load(coreConfig.messages)
         }
         syncSlowTestCommands()
     }
 
     private fun syncSlowTestCommands() {
-        if (debugConfig.slowTest.enabled) {
+        if (coreConfig.debug.slowTest.enabled) {
             if (!slowTestCommandRegistered) {
                 chatCommandManager.register(slowTestOverRegistration)
                 slowTestCommandRegistered = true
@@ -339,168 +309,110 @@ class HyperZoneLoginMain(
         }
     }
 
-    private fun loadDatabaseConfig() {
-        val config = ConfigLoader.loadConfig<DatabaseSourceConfig>(
-            dataDirectory = dataDirectory,
-            fileName = "core.conf",
-            nodePath = arrayOf("database"),
-            header = "HyperZoneLogin Database Configuration | by ksqeib\n",
-            defaultProvider = { DatabaseSourceConfig() }
-        )
-        databaseSourceConfig = config
-    }
+
     
-    private fun loadRemapConfig() {
-        val config = ConfigLoader.loadConfig<RemapConfig>(
-            dataDirectory = dataDirectory,
-            fileName = "core.conf",
-            nodePath = arrayOf("remap"),
-            header = "HyperZoneLogin Remap Configuration | by ksqeib\n",
-            defaultProvider = { RemapConfig() }
-        )
-        remapConfig = config
-    }
 
-    private fun loadMiscConfig() {
-        miscConfig = ConfigLoader.loadConfig<MiscConfig>(
-            dataDirectory = dataDirectory,
-            fileName = "core.conf",
-            nodePath = arrayOf("misc"),
-            header = "HyperZoneLogin Misc Configuration | by ksqeib\n",
-            defaultProvider = { MiscConfig() },
-            postLoadHook = { node, loaded, _ -> readMiscConfig(node) },
-            forceSaveHook = { node, firstCreation -> firstCreation || hasLegacyMiscLayout(node) }
-        )
-    }
 
-    private fun readMiscConfig(node: ConfigurationNode): MiscConfig {
-        val loaded = runCatching {
-            node.get(MiscConfig::class.java)
-        }.getOrNull() ?: MiscConfig()
 
-        val legacyEnableNameHotChange = node.node("enableNameHotChange").getBooleanOrNull()
-        val legacyEnableUuidHotChange = node.node("enableUuidHotChange").getBooleanOrNull()
-        val legacyEmbeddedEnableNameHotChange = node.node("debug", "enableNameHotChange").getBooleanOrNull()
-        val legacyEmbeddedEnableUuidHotChange = node.node("debug", "enableUuidHotChange").getBooleanOrNull()
 
-        return loaded.copy(
-            enableNameHotChange = legacyEnableNameHotChange
-                ?: legacyEmbeddedEnableNameHotChange
-                ?: loaded.enableNameHotChange,
-            enableUuidHotChange = legacyEnableUuidHotChange
-                ?: legacyEmbeddedEnableUuidHotChange
-                ?: loaded.enableUuidHotChange
-        )
-    }
 
-    private fun hasLegacyMiscLayout(node: ConfigurationNode): Boolean {
-        return !node.node("enableNameHotChange").virtual()
-            || !node.node("enableUuidHotChange").virtual()
-    }
 
-    private fun loadDebugConfig() {
-        debugConfig = ConfigLoader.loadConfig<DebugConfig>(
-            dataDirectory = dataDirectory,
-            fileName = "core.conf",
-            nodePath = arrayOf("debug"),
-            header = "HyperZoneLogin Debug Configuration | by ksqeib\n包含 debug 日志与慢测试功能开关。\n",
-            defaultProvider = { DebugConfig() },
-            postLoadHook = { node, _, _ -> readDebugConfig(node) }
-        )
-    }
 
-    private fun readDebugConfig(node: ConfigurationNode): DebugConfig {
-        return runCatching {
-            node.get(DebugConfig::class.java)
-        }.getOrNull() ?: DebugConfig()
-    }
+
+
+
+
 
     private fun ConfigurationNode.getBooleanOrNull(): Boolean? {
         return if (virtual()) null else boolean
     }
 
-    private fun loadModulesConfig() {
-        val config = ConfigLoader.loadConfig<ModulesConfig>(
+
+
+
+
+
+
+
+    private fun loadCoreConfig() {
+        val config = ConfigLoader.loadConfig<CoreConfig>(
             dataDirectory = dataDirectory,
             fileName = "core.conf",
-            nodePath = arrayOf("modules"),
-            header = "HyperZoneLogin Embedded Modules Configuration | by ksqeib\n在单文件版中控制内置模块是否启用；若同名外部插件已安装，则自动跳过内置版本。\n",
-            defaultProvider = { ModulesConfig() }
+            header = "HyperZoneLogin Core Configuration | by ksqeib\nThis file contains all core module settings.\n",
+            defaultProvider = { CoreConfig() },
+            postLoadHook = { node, loaded, _ -> readCoreConfig(node, loaded) },
+            forceSaveHook = { node, firstCreation -> firstCreation || hasLegacyMiscLayout(node) }
         )
-        modulesConfig = config
+        coreConfig = config
     }
-
-    private fun loadVServerConfig() {
-        val config = ConfigLoader.loadConfig<VServerConfig>(
-            dataDirectory = dataDirectory,
-            fileName = "core.conf",
-            nodePath = arrayOf("vServer"),
-            header = "HyperZoneLogin Backend Server Configuration | by ksqeib\n",
-            defaultProvider = { VServerConfig() }
+    private fun readCoreConfig(node: ConfigurationNode, loaded: CoreConfig): CoreConfig {
+        val legacyEnableNameHotChange = node.node("misc", "enableNameHotChange").getBooleanOrNull()
+        val legacyEnableUuidHotChange = node.node("misc", "enableUuidHotChange").getBooleanOrNull()
+        val legacyEmbeddedEnableNameHotChange = node.node("debug", "enableNameHotChange").getBooleanOrNull()
+        val legacyEmbeddedEnableUuidHotChange = node.node("debug", "enableUuidHotChange").getBooleanOrNull()
+        val newMisc = loaded.misc.copy(
+            enableNameHotChange = legacyEnableNameHotChange
+                ?: legacyEmbeddedEnableNameHotChange
+                ?: loaded.misc.enableNameHotChange,
+            enableUuidHotChange = legacyEnableUuidHotChange
+                ?: legacyEmbeddedEnableUuidHotChange
+                ?: loaded.misc.enableUuidHotChange
         )
-        vServerConfig = config
+        return loaded.copy(misc = newMisc)
     }
-
-
-    private fun loadMessagesConfig() {
-        val config = ConfigLoader.loadConfig<MessagesConfig>(
-            dataDirectory = dataDirectory,
-            fileName = "core.conf",
-            nodePath = arrayOf("messages"),
-            header = "HyperZoneLogin Messages Configuration | by ksqeib\n具体文案文件位于 messages/ 目录，可分别编辑 en_us.conf / zh_cn.conf / ru_ru.conf。\n",
-            defaultProvider = { MessagesConfig() }
-        )
-        messagesConfig = config
+    private fun hasLegacyMiscLayout(node: ConfigurationNode): Boolean {
+        return !node.node("misc", "enableNameHotChange").virtual()
+            || !node.node("misc", "enableUuidHotChange").virtual()
     }
 
     private fun connectDatabase() {
         logger.info("正在初始化数据库...")
         
-        val dbConfig = when (databaseSourceConfig.type.uppercase()) {
+        val dbConfig = when (coreConfig.database.type.uppercase()) {
             "SQLITE" -> {
-                val dbPath = dataDirectory.resolve(databaseSourceConfig.sqlite.path)
+                val dbPath = dataDirectory.resolve(coreConfig.database.sqlite.path)
                 // 确保数据库文件的父目录存在
                 dbPath.parent?.let { Files.createDirectories(it) }
                 DatabaseConfig.sqlite(
                     path = dbPath.toString(),
-                    tablePrefix = databaseSourceConfig.tablePrefix,
-                    connectionTimeout = databaseSourceConfig.pool.connectionTimeout,
-                    idleTimeout = databaseSourceConfig.pool.idleTimeout,
-                    maxLifetime = databaseSourceConfig.pool.maxLifetime
+                    tablePrefix = coreConfig.database.tablePrefix,
+                    connectionTimeout = coreConfig.database.pool.connectionTimeout,
+                    idleTimeout = coreConfig.database.pool.idleTimeout,
+                    maxLifetime = coreConfig.database.pool.maxLifetime
                 )
             }
             "MYSQL" -> {
                 DatabaseConfig.mysql(
-                    host = databaseSourceConfig.mysql.host,
-                    port = databaseSourceConfig.mysql.port,
-                    database = databaseSourceConfig.mysql.database,
-                    username = databaseSourceConfig.mysql.username,
-                    password = databaseSourceConfig.mysql.password,
-                    tablePrefix = databaseSourceConfig.tablePrefix,
-                    parameters = databaseSourceConfig.mysql.parameters,
-                    driverClassName = databaseSourceConfig.mysql.driverClassName,
-                    maximumPoolSize = databaseSourceConfig.pool.maximumPoolSize,
-                    minimumIdle = databaseSourceConfig.pool.minimumIdle,
-                    connectionTimeout = databaseSourceConfig.pool.connectionTimeout,
-                    idleTimeout = databaseSourceConfig.pool.idleTimeout,
-                    maxLifetime = databaseSourceConfig.pool.maxLifetime
+                    host = coreConfig.database.mysql.host,
+                    port = coreConfig.database.mysql.port,
+                    database = coreConfig.database.mysql.database,
+                    username = coreConfig.database.mysql.username,
+                    password = coreConfig.database.mysql.password,
+                    tablePrefix = coreConfig.database.tablePrefix,
+                    parameters = coreConfig.database.mysql.parameters,
+                    driverClassName = coreConfig.database.mysql.driverClassName,
+                    maximumPoolSize = coreConfig.database.pool.maximumPoolSize,
+                    minimumIdle = coreConfig.database.pool.minimumIdle,
+                    connectionTimeout = coreConfig.database.pool.connectionTimeout,
+                    idleTimeout = coreConfig.database.pool.idleTimeout,
+                    maxLifetime = coreConfig.database.pool.maxLifetime
                 )
             }
             "MARIADB" -> {
                 DatabaseConfig.mariadb(
-                    host = databaseSourceConfig.mariadb.host,
-                    port = databaseSourceConfig.mariadb.port,
-                    database = databaseSourceConfig.mariadb.database,
-                    username = databaseSourceConfig.mariadb.username,
-                    password = databaseSourceConfig.mariadb.password,
-                    tablePrefix = databaseSourceConfig.tablePrefix,
-                    parameters = databaseSourceConfig.mariadb.parameters,
-                    driverClassName = databaseSourceConfig.mariadb.driverClassName,
-                    maximumPoolSize = databaseSourceConfig.pool.maximumPoolSize,
-                    minimumIdle = databaseSourceConfig.pool.minimumIdle,
-                    connectionTimeout = databaseSourceConfig.pool.connectionTimeout,
-                    idleTimeout = databaseSourceConfig.pool.idleTimeout,
-                    maxLifetime = databaseSourceConfig.pool.maxLifetime
+                    host = coreConfig.database.mariadb.host,
+                    port = coreConfig.database.mariadb.port,
+                    database = coreConfig.database.mariadb.database,
+                    username = coreConfig.database.mariadb.username,
+                    password = coreConfig.database.mariadb.password,
+                    tablePrefix = coreConfig.database.tablePrefix,
+                    parameters = coreConfig.database.mariadb.parameters,
+                    driverClassName = coreConfig.database.mariadb.driverClassName,
+                    maximumPoolSize = coreConfig.database.pool.maximumPoolSize,
+                    minimumIdle = coreConfig.database.pool.minimumIdle,
+                    connectionTimeout = coreConfig.database.pool.connectionTimeout,
+                    idleTimeout = coreConfig.database.pool.idleTimeout,
+                    maxLifetime = coreConfig.database.pool.maxLifetime
                 )
             }
             "H2" -> {
@@ -509,13 +421,13 @@ class HyperZoneLoginMain(
                 )
             }
             else -> {
-                logger.error("不支持的数据库类型: ${databaseSourceConfig.type}, 使用默认 SQLite")
-                val dbPath = dataDirectory.resolve(databaseSourceConfig.sqlite.path)
+                logger.error("不支持的数据库类型: ${coreConfig.database.type}, 使用默认 SQLite")
+                val dbPath = dataDirectory.resolve(coreConfig.database.sqlite.path)
                 // 确保数据库文件的父目录存在
                 dbPath.parent?.let { Files.createDirectories(it) }
                 DatabaseConfig.sqlite(
                     path = dbPath.toString(),
-                    tablePrefix = databaseSourceConfig.tablePrefix
+                    tablePrefix = coreConfig.database.tablePrefix
                 )
             }
         }

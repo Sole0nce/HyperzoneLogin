@@ -192,7 +192,7 @@ class OutPreBackendBridge(
 
     private fun startHandshake(connection: MinecraftConnection) {
         val protocolVersion: ProtocolVersion = player.protocolVersion
-        val vServerConfig = HyperZoneLoginMain.getVServerConfig()
+        val vServerConfig = HyperZoneLoginMain.getCoreConfig().vServer
         val targetAddress = targetAddress()
         val handshake = HandshakePacket()
         handshake.setIntent(HandshakeIntent.LOGIN)

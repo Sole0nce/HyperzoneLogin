@@ -51,7 +51,7 @@ class BackendRuntimeProfileCompensator(
     @Subscribe
     fun onProfileAttached(event: ProfileAttachedEvent) {
         val main = HyperZoneLoginMain.getInstance()
-        if (!HyperZoneLoginMain.getMiscConfig().enableReplaceGameProfile
+        if (!HyperZoneLoginMain.getCoreConfig().misc.enableReplaceGameProfile
             || main.serverAdapter?.needsBackendRuntimeProfileSync() != true
         ) {
             return
@@ -79,8 +79,8 @@ class BackendRuntimeProfileCompensator(
         val targetGameProfile = buildDeliveredGameProfile(
             currentGameProfile = currentGameProfile,
             attachedProfile = attachedProfile,
-            enableNameHotChange = HyperZoneLoginMain.getMiscConfig().enableNameHotChange,
-            enableUuidHotChange = HyperZoneLoginMain.getMiscConfig().enableUuidHotChange,
+            enableNameHotChange = HyperZoneLoginMain.getCoreConfig().misc.enableNameHotChange,
+            enableUuidHotChange = HyperZoneLoginMain.getCoreConfig().misc.enableUuidHotChange,
         )
         if (currentGameProfile == targetGameProfile) {
             return

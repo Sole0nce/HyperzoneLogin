@@ -115,7 +115,7 @@ class ChatSessionKillerPacketReplacer(
 
         player = resolvedPlayer
         val hyperPlayer = HyperZonePlayerManager.getByPlayerOrNull(player)
-        shouldKill = HyperZoneLoginMain.getMiscConfig().killChatSession
+        shouldKill = HyperZoneLoginMain.getCoreConfig().misc.killChatSession
             && hyperPlayer?.isOnlinePlayer == true
             && ChatSessionUpdatePacketIdResolver.resolve(player.protocolVersion) != null
         return Unit

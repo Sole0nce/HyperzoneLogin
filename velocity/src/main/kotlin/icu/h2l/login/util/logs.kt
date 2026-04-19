@@ -45,7 +45,7 @@ private object VelocityLoggerBridge : HyperZoneLogger {
     }
 
     override fun isDebugEnabled(type: HyperZoneDebugType): Boolean {
-        return HyperZoneLoginMain.getDebugConfig().isEnabled(type)
+        return HyperZoneLoginMain.getCoreConfig().debug.isEnabled(type)
     }
 
     override fun warn(message: String) {

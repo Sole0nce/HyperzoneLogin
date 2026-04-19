@@ -28,7 +28,7 @@ import icu.h2l.api.player.HyperZonePlayerAccessor
 import icu.h2l.api.profile.HyperZoneProfileService
 import icu.h2l.login.auth.offline.OfflineAuthMessages
 import icu.h2l.login.auth.offline.api.db.OfflineAuthEntry
-import icu.h2l.login.auth.offline.config.OfflineAuthConfigLoader
+import icu.h2l.login.auth.offline.config.AuthOfflineConfigLoader
 import icu.h2l.login.auth.offline.db.OfflineAuthRepository
 import icu.h2l.login.auth.offline.mail.OfflineAuthEmailSender
 import icu.h2l.login.auth.offline.totp.OfflineTotpAuthenticator
@@ -88,8 +88,8 @@ class OfflineAuthService(
                 successMessage = OfflineAuthMessages.REGISTER_SUCCESS,
                 failureMessage = OfflineAuthMessages.REGISTER_FAILED,
                 markVerified = true,
-                issueSession = OfflineAuthConfigLoader.getConfig().session.enabled &&
-                    OfflineAuthConfigLoader.getConfig().session.issueOnRegister
+                issueSession = AuthOfflineConfigLoader.getConfig().main.session.enabled &&
+                    AuthOfflineConfigLoader.getConfig().main.session.issueOnRegister
             )
         }
 
@@ -206,7 +206,7 @@ class OfflineAuthService(
         }
 
         if (!verifyPassword(password, entry)) {
-            val protection = OfflineAuthConfigLoader.getConfig().login
+            val protection = AuthOfflineConfigLoader.getConfig().main.login
             val nextFailCount = entry.loginFailCount + 1
             if (nextFailCount >= protection.maxAttempts) {
                 val blockedTo = now + protection.blockSeconds * 1000L
@@ -452,7 +452,7 @@ class OfflineAuthService(
         val entry = repository.getByEmail(normalizedEmail) ?: return Result(false, OfflineAuthMessages.EMAIL_NOT_SET)
         val profileId = entry.profileId
         val now = System.currentTimeMillis()
-        val emailConfig = OfflineAuthConfigLoader.getConfig().email
+        val emailConfig = AuthOfflineConfigLoader.getConfig().main.email
         val cooldownMillis = emailConfig.recoveryCooldownSeconds * 1000L
 
         if (entry.recoveryRequestedAt != null && now - entry.recoveryRequestedAt < cooldownMillis) {
@@ -495,7 +495,7 @@ class OfflineAuthService(
             return Result(false, OfflineAuthMessages.RECOVERY_CODE_EXPIRED)
         }
 
-        val emailConfig = OfflineAuthConfigLoader.getConfig().email
+        val emailConfig = AuthOfflineConfigLoader.getConfig().main.email
         if (entry.recoveryVerifyTries >= emailConfig.maxCodeVerifyAttempts) {
             repository.clearRecoveryState(profileId)
             return Result(false, OfflineAuthMessages.recoveryCodeAttemptsExceeded())
@@ -577,17 +577,17 @@ class OfflineAuthService(
             prompts += OfflineAuthMessages.TOTP_LOGIN_HINT
         }
         prompts += OfflineAuthMessages.CHANGE_PASSWORD_PROMPT
-        if (OfflineAuthConfigLoader.getConfig().prompt.showRecoveryHint && !entry.email.isNullOrBlank()) {
+        if (AuthOfflineConfigLoader.getConfig().main.prompt.showRecoveryHint && !entry.email.isNullOrBlank()) {
             prompts += OfflineAuthMessages.RECOVERY_HINT
         }
-        if (OfflineAuthConfigLoader.getConfig().email.enabled) {
+        if (AuthOfflineConfigLoader.getConfig().main.email.enabled) {
             prompts += if (entry.email.isNullOrBlank()) {
                 OfflineAuthMessages.EMAIL_ADD_PROMPT
             } else {
                 OfflineAuthMessages.emailShow(entry.email)
             }
         }
-        if (OfflineAuthConfigLoader.getConfig().totp.enabled) {
+        if (AuthOfflineConfigLoader.getConfig().main.totp.enabled) {
             prompts += if (isTotpEnabled(entry)) {
                 OfflineAuthMessages.TOTP_REMOVE_PROMPT
             } else {
@@ -598,7 +598,7 @@ class OfflineAuthService(
     }
 
     fun tryAutoLogin(player: Player): SessionCheckResult? {
-        val sessionConfig = OfflineAuthConfigLoader.getConfig().session
+        val sessionConfig = AuthOfflineConfigLoader.getConfig().main.session
         if (!sessionConfig.enabled) {
             return null
         }
@@ -610,7 +610,7 @@ class OfflineAuthService(
 
         val entry = resolveEntryByPlayer(player) ?: return null
         val profileId = entry.profileId
-        if (isTotpEnabled(entry) && !OfflineAuthConfigLoader.getConfig().totp.allowSessionBypass) {
+        if (isTotpEnabled(entry) && !AuthOfflineConfigLoader.getConfig().main.totp.allowSessionBypass) {
             repository.clearSession(profileId)
             publishAuthFailure(
                 player = player,
@@ -680,7 +680,7 @@ class OfflineAuthService(
     }
 
     private fun validatePassword(username: String, password: String): Result? {
-        val policy = OfflineAuthConfigLoader.getConfig().password
+        val policy = AuthOfflineConfigLoader.getConfig().main.password
         if (password.length !in policy.minLength..policy.maxLength) {
             return Result(false, OfflineAuthMessages.unsafePassword(policy.minLength, policy.maxLength))
         }
@@ -757,7 +757,7 @@ class OfflineAuthService(
     }
 
     private fun resolveProfileCreateUuid(registrationName: String): UUID? {
-        return if (OfflineAuthConfigLoader.getConfig().passOfflineUuidToProfileResolve) {
+        return if (AuthOfflineConfigLoader.getConfig().main.passOfflineUuidToProfileResolve) {
             ExtraUuidUtils.getNormalOfflineUUID(registrationName)
         } else {
             null
@@ -773,14 +773,14 @@ class OfflineAuthService(
     }
 
     private fun ensureEmailFeatureEnabled(): Result? {
-        if (!OfflineAuthConfigLoader.getConfig().email.enabled) {
+        if (!AuthOfflineConfigLoader.getConfig().main.email.enabled) {
             return Result(false, OfflineAuthMessages.EMAIL_DISABLED)
         }
         return null
     }
 
     private fun ensureTotpFeatureEnabled(): Result? {
-        if (!OfflineAuthConfigLoader.getConfig().totp.enabled) {
+        if (!AuthOfflineConfigLoader.getConfig().main.totp.enabled) {
             return Result(false, OfflineAuthMessages.TOTP_DISABLED_BY_CONFIG)
         }
         return null
@@ -825,9 +825,9 @@ class OfflineAuthService(
     }
 
     private fun issueSession(profileId: UUID, player: Player) {
-        val sessionConfig = OfflineAuthConfigLoader.getConfig().session
+        val sessionConfig = AuthOfflineConfigLoader.getConfig().main.session
         val entry = repository.getByProfileId(profileId)
-        if (entry != null && isTotpEnabled(entry) && !OfflineAuthConfigLoader.getConfig().totp.allowSessionBypass) {
+        if (entry != null && isTotpEnabled(entry) && !AuthOfflineConfigLoader.getConfig().main.totp.allowSessionBypass) {
             repository.clearSession(profileId)
             return
         }
@@ -898,7 +898,7 @@ class OfflineAuthService(
             normalizedName = normalizedName,
             knownProfileId = profileId,
             pendingRegistrationId = pendingRegistrationId,
-            passProfileCreateUuid = OfflineAuthConfigLoader.getConfig().passOfflineUuidToProfileResolve
+            passProfileCreateUuid = AuthOfflineConfigLoader.getConfig().main.passOfflineUuidToProfileResolve
         )
     }
 }

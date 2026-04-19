@@ -104,7 +104,7 @@ class VelocityHyperZoneProfileService(
 
     fun getReUuidBlockedReason(
         userName: String,
-        remapPrefix: String = HyperZoneLoginMain.getRemapConfig().prefix
+        remapPrefix: String = HyperZoneLoginMain.getCoreConfig().remap.prefix
     ): String? {
         val preferredUuid = ReUuidResolver.preferredUuid(userName, remapPrefix)
         val existingByName = databaseHelper.getProfileByName(userName) ?: return null
@@ -114,7 +114,7 @@ class VelocityHyperZoneProfileService(
 
     fun createWithReUuid(
         userName: String,
-        remapPrefix: String = HyperZoneLoginMain.getRemapConfig().prefix
+        remapPrefix: String = HyperZoneLoginMain.getCoreConfig().remap.prefix
     ): Profile {
         repeat(REUUID_CREATE_RETRIES) {
             val resolvedUuid = ReUuidResolver.resolve(
@@ -248,7 +248,7 @@ class VelocityHyperZoneProfileService(
     }
 
     private fun resolveRequestedUuid(userName: String, uuid: UUID?): UUID {
-        val remapPrefix = HyperZoneLoginMain.getRemapConfig().prefix
+        val remapPrefix = HyperZoneLoginMain.getCoreConfig().remap.prefix
         return uuid ?: RemapUtils.genUUID(userName, remapPrefix)
     }
 }

@@ -155,7 +155,7 @@ class VelocityNetworkInjectorImpl(
 
             initializer.set(object : ViaChannelInitializer(old) {
                 override fun injectChannel(channel: Channel) {
-                    if (HyperZoneLoginMain.getMiscConfig().killChatSession) {
+                    if (HyperZoneLoginMain.getCoreConfig().misc.killChatSession) {
                         channel.pipeline().addLast("h2l_chat_session_killer", ChatSessionKillerPacketReplacer(channel))
                     }
                     channel.pipeline().addLast("sl_r_rpl", LoginProfilePacketReplacer(channel))

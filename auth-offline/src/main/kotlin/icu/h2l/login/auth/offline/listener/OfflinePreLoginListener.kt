@@ -26,7 +26,7 @@ package icu.h2l.login.auth.offline.listener
 import com.velocitypowered.api.event.Subscribe
 import icu.h2l.api.event.connection.OpenPreLoginEvent
 import icu.h2l.api.log.info
-import icu.h2l.login.auth.offline.config.OfflineMatchConfigLoader
+import icu.h2l.login.auth.offline.config.AuthOfflineConfigLoader
 import icu.h2l.login.auth.offline.type.OfflineUUIDType
 import icu.h2l.login.auth.offline.util.ExtraUuidUtils
 
@@ -38,7 +38,7 @@ class OfflinePreLoginListener {
         val host = event.host
         // channel/player initialization is performed by the main plugin's EventListener
 
-        val cfg = OfflineMatchConfigLoader.getConfig()
+        val cfg = AuthOfflineConfigLoader.getConfig().match
         if (!cfg.enable) return
 
         val offlineHost = cfg.hostMatch.start.any { it.startsWith(host) }

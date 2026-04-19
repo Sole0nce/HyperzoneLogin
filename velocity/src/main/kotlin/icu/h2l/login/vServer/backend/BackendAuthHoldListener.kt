@@ -246,7 +246,7 @@ class BackendAuthHoldListener(
             return directTarget
         }
 
-        val configuredDefaultTarget = HyperZoneLoginMain.getVServerConfig().postAuthDefaultServer
+        val configuredDefaultTarget = HyperZoneLoginMain.getCoreConfig().vServer.postAuthDefaultServer
             .trim()
             .takeUnless { it.isBlank() || it.equals(authServerName, ignoreCase = true) }
             ?.takeIf { server.getServer(it).isPresent }
@@ -301,12 +301,12 @@ class BackendAuthHoldListener(
     }
 
     override fun needsBackendPlayerInfoCompat(): Boolean {
-        return HyperZoneLoginMain.getVServerConfig().backend.enablePlayerInfoCompensation
+        return HyperZoneLoginMain.getCoreConfig().vServer.backend.enablePlayerInfoCompensation
     }
 
 
     override fun needsBackendRuntimeProfileSync(): Boolean {
-        return HyperZoneLoginMain.getVServerConfig().backend.enableProfileCompensation
+        return HyperZoneLoginMain.getCoreConfig().vServer.backend.enableProfileCompensation
     }
 
     override fun needsBackendInitialProfileCompat(): Boolean {
@@ -370,11 +370,11 @@ class BackendAuthHoldListener(
     }
 
     private fun configuredAuthServerName(): String {
-        return HyperZoneLoginMain.getVServerConfig().backend.fallbackAuthServer.trim()
+        return HyperZoneLoginMain.getCoreConfig().vServer.backend.fallbackAuthServer.trim()
     }
 
     private fun rememberRequestedServerDuringAuth(): Boolean {
-        return HyperZoneLoginMain.getVServerConfig().rememberRequestedServerDuringAuth
+        return HyperZoneLoginMain.getCoreConfig().vServer.rememberRequestedServerDuringAuth
     }
 
     private fun beginBackendAuthHold(player: Player, authServerName: String, targetServerName: String?): BackendHoldState {
@@ -434,7 +434,7 @@ class BackendAuthHoldListener(
     }
 
     private fun resolveFallbackTargetServerName(player: Player, authServerName: String): String? {
-        val directConfiguredTarget = HyperZoneLoginMain.getVServerConfig().postAuthDefaultServer
+        val directConfiguredTarget = HyperZoneLoginMain.getCoreConfig().vServer.postAuthDefaultServer
             .trim()
             .takeUnless { it.isBlank() || it.equals(authServerName, ignoreCase = true) }
             ?.takeIf { server.getServer(it).isPresent }

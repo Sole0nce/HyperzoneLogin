@@ -107,7 +107,7 @@ class OutPreVServerAuthTest {
             main.activeVServerAdapter = outPre
             main.profileService = createProfileService(proxyServer)
             main.messageService = MessageService(main.dataDirectory, main.logger)
-            setStaticField("vServerConfig", VServerConfig())
+            setStaticField("coreConfig", icu.h2l.login.config.CoreConfig())
         }
     }
 

@@ -28,9 +28,8 @@ import icu.h2l.api.log.info
 import icu.h2l.api.module.HyperSubModule
 import icu.h2l.api.profile.HyperZoneProfileServiceProvider
 import icu.h2l.login.auth.offline.command.OfflineAuthCommandRegistrar
-import icu.h2l.login.auth.offline.config.OfflineAuthConfigLoader
+import icu.h2l.login.auth.offline.config.AuthOfflineConfigLoader
 import icu.h2l.login.auth.offline.config.OfflineAuthMessageResourceLoader
-import icu.h2l.login.auth.offline.config.OfflineMatchConfigLoader
 import icu.h2l.login.auth.offline.db.OfflineAuthRepository
 import icu.h2l.login.auth.offline.db.OfflineAuthTableManager
 import icu.h2l.login.auth.offline.listener.OfflinePreLoginListener
@@ -55,8 +54,7 @@ class OfflineSubModule : HyperSubModule {
 
         val profileTable = ProfileTable(databaseManager.tablePrefix)
         // Load offline matching configuration for this module
-        OfflineMatchConfigLoader.load(dataDirectory)
-        OfflineAuthConfigLoader.load(dataDirectory)
+                AuthOfflineConfigLoader.load(dataDirectory)
         OfflineAuthMessageResourceLoader.load(dataDirectory)
         offlineAuthTableManager = OfflineAuthTableManager(
             databaseManager = databaseManager,
@@ -67,7 +65,7 @@ class OfflineSubModule : HyperSubModule {
             databaseManager = databaseManager,
             table = offlineAuthTableManager.offlineAuthTable
         )
-        val offlineAuthConfig = OfflineAuthConfigLoader.getConfig()
+        val offlineAuthConfig = AuthOfflineConfigLoader.getConfig().main
         val logger = java.util.logging.Logger.getLogger("hzl-auth-offline")
         val emailSender: OfflineAuthEmailSender = when (offlineAuthConfig.email.deliveryMode.uppercase(Locale.ROOT)) {
             "SMTP" -> JakartaMailOfflineAuthEmailSender(
