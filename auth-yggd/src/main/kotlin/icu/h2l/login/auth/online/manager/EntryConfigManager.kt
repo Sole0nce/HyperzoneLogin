@@ -102,7 +102,6 @@ class EntryConfigManager(
             val config = ConfigLoader.loadConfig<EntryConfig>(
                 dataDirectory = path.parent,
                 fileName = path.fileName.toString(),
-                header = "HyperZoneLogin Entry Configuration\n配置文件格式为 HOCON\n",
                 defaultProvider = { throw IllegalStateException("无法解析配置文件: ${path.fileName}") },
                 forceSaveHook = { _, _ -> false }
             )
@@ -147,14 +146,7 @@ class EntryConfigManager(
         val examplePath = exampleDir.resolve("example$CONFIG_EXTENSION")
         createConfigFile(
             path = examplePath,
-            config = EntryConfig(),
-            header =
-                """
-                HyperZoneLogin Entry Configuration - Example
-                这是一个示例配置文件，位于 example 文件夹中的配置不会被加载
-                复制此文件到 auth-yggd 文件夹（非 example 子文件夹）中并修改即可使用
-                
-                """.trimIndent()
+            config = EntryConfig()
         )
 
             debug(HyperZoneDebugType.YGGDRASIL_AUTH) { "创建示例配置文件: ${examplePath.fileName}" }
@@ -175,13 +167,7 @@ class EntryConfigManager(
 
         createConfigFile(
             path = mojangPath,
-            config = mojangConfig,
-            header =
-                """
-                HyperZoneLogin Entry Configuration - Mojang
-                Mojang 官方正版验证服务配置
-                
-                """.trimIndent()
+            config = mojangConfig
         )
 
             debug(HyperZoneDebugType.YGGDRASIL_AUTH) { "创建默认配置文件: mojang.conf" }
@@ -197,13 +183,7 @@ class EntryConfigManager(
 
         createConfigFile(
             path = littleskinPath,
-            config = littleskinConfig,
-            header =
-                """
-                HyperZoneLogin Entry Configuration - Little Skin
-                Little Skin 第三方验证服务配置
-                
-                """.trimIndent()
+            config = littleskinConfig
         )
 
             debug(HyperZoneDebugType.YGGDRASIL_AUTH) { "创建默认配置文件: littleskin.conf" }
@@ -219,23 +199,16 @@ class EntryConfigManager(
 
         createConfigFile(
             path = elyByPath,
-            config = elyByConfig,
-            header =
-                """
-                HyperZoneLogin Entry Configuration - Ely.by
-                Ely.by 第三方验证服务配置
-                
-                """.trimIndent()
+            config = elyByConfig
         )
 
             debug(HyperZoneDebugType.YGGDRASIL_AUTH) { "创建默认配置文件: elyby.conf" }
     }
 
-    private fun createConfigFile(path: Path, config: EntryConfig, header: String) {
+    private fun createConfigFile(path: Path, config: EntryConfig) {
         ConfigLoader.loadConfig(
             dataDirectory = path.parent,
             fileName = path.fileName.toString(),
-            header = header,
             defaultProvider = { config },
             postLoadHook = { _, _, _ -> config },
             forceSaveHook = { _, _ -> true }

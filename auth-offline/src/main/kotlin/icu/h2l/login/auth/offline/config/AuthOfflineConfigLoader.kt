@@ -32,7 +32,6 @@ object AuthOfflineConfigLoader {
             dataDirectory = dataDirectory,
             fileName = "auth-offline.conf",
             nodePath = emptyArray(),
-            header = "HyperZoneLogin Offline Module Configuration | by ksqeib\nThis file contains all offline auth module settings.\n",
             defaultProvider = { AuthOfflineConfig() }
         )
     }

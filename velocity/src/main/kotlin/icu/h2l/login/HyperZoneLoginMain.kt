@@ -33,6 +33,8 @@ import icu.h2l.api.module.HyperSubModule
 import icu.h2l.api.player.HyperZonePlayerAccessor
 import icu.h2l.api.profile.HyperZoneProfileServiceProvider
 import icu.h2l.api.util.ConfigCommentTranslatorProvider
+import icu.h2l.api.util.ConfigFormat
+import icu.h2l.api.util.ConfigFormatProvider
 import icu.h2l.api.util.ConfigLoader
 import icu.h2l.login.config.i18n.ConfigCommentI18nService
 import icu.h2l.api.vServer.HyperZoneVServerAdapter
@@ -98,8 +100,13 @@ class HyperZoneLoginMain(
     companion object {
         private lateinit var instance: HyperZoneLoginMain
         private lateinit var coreConfig: CoreConfig
+        private lateinit var startConfig: StartConfig
+
         @JvmStatic
         fun getCoreConfig(): CoreConfig = coreConfig
+
+        @JvmStatic
+        fun getStartConfig(): StartConfig = startConfig
 
         @JvmStatic
         fun getInstance(): HyperZoneLoginMain = instance
@@ -113,8 +120,20 @@ class HyperZoneLoginMain(
     @Suppress("unused", "UNUSED_PARAMETER")
     fun onEnable(event: ProxyInitializeEvent) {
         registerApiLogger()
-        // 在加载任何配置之前初始化配置注释 i18n 服务
-        ConfigCommentTranslatorProvider.bind(ConfigCommentI18nService(logger))
+        // ── 第一步：加载启动前置配置（不受 i18n 影响，硬编码提示）──────────────────────
+        startConfig = StartConfigLoader.load(dataDirectory)
+        if (!startConfig.ready) {
+            logger.error("================================================================")
+            logger.error("  你看起来似乎还没准备好，请先配置 start.conf 再继续使用 HyperZoneLogin")
+            logger.error("  It seems you are not ready yet.")
+            logger.error("  Please configure start.conf before using HyperZoneLogin.")
+            logger.error("================================================================")
+            return
+        }
+        // ── 第二步：根据 start.conf 中的 format 绑定全局配置格式 ──────────────────────
+        ConfigFormatProvider.bind(ConfigFormat.fromKey(startConfig.format))
+        // ── 第三步：根据 start.conf 中的 language 初始化配置注释 i18n 服务 ──────────
+        ConfigCommentTranslatorProvider.bind(ConfigCommentI18nService(logger, startConfig.language))
         loadCoreConfig()
         messageService = MessageService(dataDirectory, logger)
         messageService.load(coreConfig.messages)
@@ -342,7 +361,6 @@ class HyperZoneLoginMain(
         val config = ConfigLoader.loadConfig<CoreConfig>(
             dataDirectory = dataDirectory,
             fileName = "core.conf",
-            header = "HyperZoneLogin Core Configuration | by ksqeib\nThis file contains all core module settings.\n",
             defaultProvider = { CoreConfig() }
         )
         coreConfig = config

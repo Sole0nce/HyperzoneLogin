@@ -72,7 +72,6 @@ class MergeSubModule : HyperSubModule {
         return ConfigLoader.loadConfig(
             dataDirectory = mergeDirectory,
             fileName = "multilogin.conf",
-            header = "HyperZoneLogin ML Merge Configuration\n",
             defaultProvider = { MergeMlConfig() },
             postLoadHook = { _, loaded, firstCreation ->
                 if (firstCreation) {
@@ -90,7 +89,6 @@ class MergeSubModule : HyperSubModule {
         return ConfigLoader.loadConfig(
             dataDirectory = mergeDirectory,
             fileName = "authme.conf",
-            header = "HyperZoneLogin AUTHME Merge Configuration\n",
             defaultProvider = { MergeAmConfig() },
             postLoadHook = { _, loaded, firstCreation ->
                 if (firstCreation) {

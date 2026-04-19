@@ -19,19 +19,30 @@
  *
  */
 
-package icu.h2l.login.auth.floodgate.config
+package icu.h2l.api.util
 
-import icu.h2l.api.util.ConfigLoader
-import java.nio.file.Path
+/**
+ * 配置文件序列化格式，由 start.conf 中的 `format` 字段决定。
+ *
+ * [HOCON] — Human-Optimized Config Object Notation（默认，功能最完整）
+ * [GSON]  — JSON 格式，基于 configurate-gson
+ * [YAML]  — YAML 格式，基于 configurate-yaml
+ */
+enum class ConfigFormat(
+    /** start.conf 中 format 字段对应的字符串值（不区分大小写）*/
+    val key: String
+) {
+    HOCON("hocon"),
+    GSON("gson"),
+    YAML("yaml");
 
-object FloodgateAuthConfigLoader {
-    private const val FILE_NAME = "auth-floodgate.conf"
-
-    fun load(dataDirectory: Path): FloodgateAuthConfig {
-        return ConfigLoader.loadConfig(
-            dataDirectory = dataDirectory,
-            fileName = FILE_NAME,
-            defaultProvider = { FloodgateAuthConfig() }
-        )
+    companion object {
+        /**
+         * 将 start.conf 中的原始字符串解析为 [ConfigFormat]。
+         * 未知值回退到 [HOCON] 并不抛出异常，以保证向前兼容。
+         */
+        fun fromKey(key: String): ConfigFormat =
+            entries.firstOrNull { it.key.equals(key.trim(), ignoreCase = true) } ?: HOCON
     }
 }
+

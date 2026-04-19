@@ -31,7 +31,6 @@ object ProfileSkinConfigLoader {
         return ConfigLoader.loadConfig(
             dataDirectory = dataDirectory,
             fileName = FILE_NAME,
-            header = "HyperZoneLogin Profile Skin Configuration\n配置文件格式为 HOCON\n",
             defaultProvider = { ProfileSkinConfig() }
         )
     }

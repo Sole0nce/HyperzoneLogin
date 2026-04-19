@@ -29,7 +29,6 @@ object SafeConfigLoader {
         return ConfigLoader.loadConfig(
             dataDirectory = dataDirectory,
             fileName = "safe.conf",
-            header = "HyperZoneLogin Safe Configuration\n入口层安全防护配置\n",
             defaultProvider = { SafeConfig() }
         )
     }

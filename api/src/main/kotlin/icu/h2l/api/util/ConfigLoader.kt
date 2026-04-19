@@ -24,9 +24,11 @@ package icu.h2l.api.util
 import org.spongepowered.configurate.CommentedConfigurationNode
 import org.spongepowered.configurate.ConfigurationNode
 import org.spongepowered.configurate.ConfigurationOptions
+import org.spongepowered.configurate.gson.GsonConfigurationLoader
 import org.spongepowered.configurate.hocon.HoconConfigurationLoader
 import org.spongepowered.configurate.kotlin.dataClassFieldDiscoverer
 import org.spongepowered.configurate.objectmapping.ObjectMapper
+import org.spongepowered.configurate.yaml.YamlConfigurationLoader
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -34,11 +36,11 @@ import java.nio.file.Path
 
 object ConfigLoader {
     /**
-     * Unified configuration loader for HOCON files.
+     * Unified configuration loader supporting HOCON / Gson / YAML formats.
+     * The format is determined by [ConfigFormatProvider], which is bound from start.conf at startup.
      * @param dataDirectory The directory containing the configuration file
      * @param fileName The name of the configuration file (e.g., "remap.conf")
      * @param nodePath The path within the configuration file. Use an array of keys for nested structures.
-     * @param header Intended header for the file
      * @param defaultProvider Provides the default config object if reading fails or file empty
      * @param postLoadHook A hook that gets invoked immediately after loading/getting the config. Returning a non-null instance overrides the default/loaded result.
      * @param forceSaveHook Whether to save the file back, usually true if first creation, but can be customized
@@ -47,25 +49,13 @@ object ConfigLoader {
         dataDirectory: Path,
         fileName: String,
         nodePath: Array<String> = emptyArray(),
-        header: String = "",
         defaultProvider: () -> T,
         noinline postLoadHook: ((ConfigurationNode, T, Boolean) -> T)? = null,
         noinline forceSaveHook: ((ConfigurationNode, Boolean) -> Boolean) = { _, firstCreation -> firstCreation }
     ): T {
         val path = dataDirectory.resolve(fileName)
         val fileNotExists = Files.notExists(path)
-        val loader = HoconConfigurationLoader.builder()
-            .defaultOptions { opts: ConfigurationOptions ->
-                opts.shouldCopyDefaults(true)
-                    .header(header)
-                    .serializers { s ->
-                        s.registerAnnotatedObjects(
-                            ObjectMapper.factoryBuilder().addDiscoverer(dataClassFieldDiscoverer()).build()
-                        )
-                    }
-            }
-            .path(path)
-            .build()
+        val loader = buildLoader(path)
         val node = loader.load()
         val targetNode = if (nodePath.isEmpty()) node else node.node(*nodePath)
 
@@ -78,12 +68,57 @@ object ConfigLoader {
 
         if (shouldSave) {
             targetNode.set(finalConfig)
-            ConfigCommentTranslatorProvider.getOrNull()?.let { translator ->
-                translateNodeComments(node, translator)
+            val commentedNode = node as? CommentedConfigurationNode
+            if (commentedNode != null) {
+                ConfigCommentTranslatorProvider.getOrNull()?.let { translator ->
+                    translateNodeComments(commentedNode, translator)
+                }
             }
             loader.save(node)
         }
         return finalConfig
+    }
+
+    /**
+     * 根据 [ConfigFormatProvider] 当前格式和 [path] 构建对应的 ConfigurationLoader。
+     *
+     * - [ConfigFormat.HOCON] → [HoconConfigurationLoader]（支持 header 注释）
+     * - [ConfigFormat.GSON]  → [GsonConfigurationLoader]（JSON，不支持 header）
+     * - [ConfigFormat.YAML]  → [YamlConfigurationLoader]（YAML，不支持 header）
+     *
+     * 所有格式均注册 Kotlin data-class 字段发现器，确保 ObjectMapper 正常工作。
+     */
+    @PublishedApi
+    internal fun buildLoader(path: Path): org.spongepowered.configurate.loader.AbstractConfigurationLoader<*> {
+        val objectMapperFactory = ObjectMapper.factoryBuilder()
+            .addDiscoverer(dataClassFieldDiscoverer())
+            .build()
+
+        return when (ConfigFormatProvider.get()) {
+            ConfigFormat.GSON -> GsonConfigurationLoader.builder()
+                .defaultOptions { opts: ConfigurationOptions ->
+                    opts.shouldCopyDefaults(true)
+                        .serializers { s -> s.registerAnnotatedObjects(objectMapperFactory) }
+                }
+                .path(path)
+                .build()
+
+            ConfigFormat.YAML -> YamlConfigurationLoader.builder()
+                .defaultOptions { opts: ConfigurationOptions ->
+                    opts.shouldCopyDefaults(true)
+                        .serializers { s -> s.registerAnnotatedObjects(objectMapperFactory) }
+                }
+                .path(path)
+                .build()
+
+            ConfigFormat.HOCON -> HoconConfigurationLoader.builder()
+                .defaultOptions { opts: ConfigurationOptions ->
+                    opts.shouldCopyDefaults(true)
+                        .serializers { s -> s.registerAnnotatedObjects(objectMapperFactory) }
+                }
+                .path(path)
+                .build()
+        }
     }
 
     @PublishedApi
