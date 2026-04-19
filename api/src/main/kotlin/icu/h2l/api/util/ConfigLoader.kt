@@ -21,6 +21,7 @@
 
 package icu.h2l.api.util
 
+import icu.h2l.api.log.warn
 import org.spongepowered.configurate.CommentedConfigurationNode
 import org.spongepowered.configurate.ConfigurationNode
 import org.spongepowered.configurate.ConfigurationOptions
@@ -62,6 +63,29 @@ object ConfigLoader {
         val firstCreation = fileNotExists || targetNode.virtual()
 
         val loaded = runCatching { targetNode.get(T::class.java) }.getOrNull() ?: defaultProvider()
+
+        // Detect schema mismatch: compare actual file keys with expected keys from a freshly serialised default instance
+        if (!targetNode.virtual() && targetNode.isMap) {
+            runCatching {
+                val tempNode = loader.createNode()
+                tempNode.set(T::class.java, loaded)
+                val expectedKeys = tempNode.childrenMap().keys.map { it.toString() }.toSet()
+                val actualKeys = targetNode.childrenMap().keys.map { it.toString() }.toSet()
+                val extraKeys = actualKeys - expectedKeys
+                val missingKeys = expectedKeys - actualKeys
+                if (extraKeys.isNotEmpty() || missingKeys.isNotEmpty()) {
+                    warn {
+                        buildString {
+                            append("[ConfigLoader] Schema mismatch detected in \"$fileName\"")
+                            if (nodePath.isNotEmpty()) append(" (node: ${nodePath.joinToString(".")})")
+                            append(". It is recommended to delete the file and let it regenerate.")
+                            if (extraKeys.isNotEmpty()) append(" Extra keys (no longer used): $extraKeys.")
+                            if (missingKeys.isNotEmpty()) append(" Missing keys (new defaults will be used): $missingKeys.")
+                        }
+                    }
+                }
+            }
+        }
 
         val finalConfig = postLoadHook?.invoke(targetNode, loaded, firstCreation) ?: loaded
         val shouldSave = forceSaveHook(targetNode, firstCreation)
