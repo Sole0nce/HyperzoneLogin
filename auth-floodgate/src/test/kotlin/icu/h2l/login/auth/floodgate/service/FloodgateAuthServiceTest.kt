@@ -29,7 +29,7 @@ import icu.h2l.api.profile.HyperZoneCredential
 import icu.h2l.api.profile.HyperZoneProfileService
 import icu.h2l.login.auth.floodgate.config.FloodgateAuthConfig
 import icu.h2l.login.auth.floodgate.credential.FloodgateHyperZoneCredential
-import icu.h2l.login.auth.floodgate.db.FloodgateAuthEntry
+import icu.h2l.login.auth.floodgate.api.db.FloodgateAuthEntry
 import icu.h2l.login.auth.floodgate.db.FloodgateAuthRepository
 import io.mockk.*
 import io.netty.channel.Channel

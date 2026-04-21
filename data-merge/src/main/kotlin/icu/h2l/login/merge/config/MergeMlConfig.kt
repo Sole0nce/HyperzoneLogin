@@ -40,6 +40,12 @@ class MergeMlConfig {
         1 to "mojang"
     )
 
+    // 指定哪些 MultiLogin 服务ID 属于 Floodgate 服务。
+    // 匹配的记录将使用 Floodgate 特殊迁移逻辑：
+    // 将 online_uuid 转换为 XUID 并写入 floodgate_auth 表，而非普通入口表。
+    @Comment("config.merge-ml.floodgate-service-ids")
+    var floodgateServiceIds: MutableList<Int> = mutableListOf()
+
     @ConfigSerializable
     class SourceConfig {
         // 库类型，支持 H2DB 或 MYSQL

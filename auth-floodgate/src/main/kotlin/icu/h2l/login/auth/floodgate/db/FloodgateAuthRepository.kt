@@ -22,6 +22,8 @@
 package icu.h2l.login.auth.floodgate.db
 
 import icu.h2l.api.db.HyperZoneDatabaseManager
+import icu.h2l.login.auth.floodgate.api.db.FloodgateAuthEntry
+import icu.h2l.login.auth.floodgate.api.db.FloodgateAuthTable
 import icu.h2l.api.log.warn
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.insert

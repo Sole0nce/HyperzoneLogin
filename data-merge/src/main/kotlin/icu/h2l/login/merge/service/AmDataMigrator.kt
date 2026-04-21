@@ -59,7 +59,7 @@ class AmDataMigrator(
 
     fun migrate(): Report {
         val report = Report()
-        val mergeDirectory = dataDirectory.resolve("merge")
+        val mergeDirectory = dataDirectory.resolve("data-merge")
         Files.createDirectories(mergeDirectory)
         val logPath = mergeDirectory.resolve("merge-am.log")
         val sourceReader = AmSourceReader(dataDirectory, config)

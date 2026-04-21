@@ -23,6 +23,7 @@ package icu.h2l.login.merge.service
 
 import icu.h2l.api.db.HyperZoneDatabaseManager
 import icu.h2l.api.db.table.ProfileTable
+import icu.h2l.login.auth.floodgate.api.db.FloodgateAuthTable
 import icu.h2l.login.auth.online.api.db.EntryTable
 import icu.h2l.login.merge.config.MergeMlConfig
 import org.jetbrains.exposed.sql.*
@@ -45,12 +46,17 @@ class MlDataMigrator(
         var targetEntriesMatched: Int = 0,
         var targetEntryConflicts: Int = 0,
         var targetEntryFailures: Int = 0,
-        var missingProfileReference: Int = 0
+        var missingProfileReference: Int = 0,
+        var floodgateEntriesCreated: Int = 0,
+        var floodgateEntriesMatched: Int = 0,
+        var floodgateEntryConflicts: Int = 0,
+        var floodgateEntryFailures: Int = 0,
+        var floodgateInvalidUuid: Int = 0,
     )
 
     fun migrate(): Report {
         val report = Report()
-        val mergeDirectory = dataDirectory.resolve("merge")
+        val mergeDirectory = dataDirectory.resolve("data-merge")
         Files.createDirectories(mergeDirectory)
         val logPath = mergeDirectory.resolve("merge-ml.log")
         val sourceReader = MlSourceReader(dataDirectory, config)
@@ -70,6 +76,7 @@ class MlDataMigrator(
             val profileUuidToId = mutableMapOf<UUID, UUID>()
             val profileIdToName = mutableMapOf<UUID, String>()
             val entryTables = mutableMapOf<String, EntryTable>()
+            val floodgateAuthTable = FloodgateAuthTable(databaseManager.tablePrefix, profileTable)
 
             databaseManager.executeTransaction {
                 SchemaUtils.create(profileTable)
@@ -129,6 +136,8 @@ class MlDataMigrator(
                     }
                 }
 
+                SchemaUtils.createMissingTablesAndColumns(floodgateAuthTable)
+
                 for (sourceUser in sourceUsers) {
                     val profileUuid = sourceUser.inGameProfileUuid
                     if (profileUuid == null) {
@@ -141,6 +150,52 @@ class MlDataMigrator(
                     if (profileId == null) {
                         report.missingProfileReference++
                         logger.log("[ENTRY][SKIP] service=${sourceUser.serviceId} onlineUuid=${sourceUser.onlineUuid} inGameProfileUuid=$profileUuid reason=profile not found")
+                        continue
+                    }
+
+                    // Floodgate 特殊迁移路径
+                    if (sourceUser.serviceId in config.floodgateServiceIds) {
+                        val onlineUuid = sourceUser.onlineUuid
+                        // isFloodgateId: mostSignificantBits == 0
+                        if (onlineUuid.mostSignificantBits != 0L) {
+                            report.floodgateInvalidUuid++
+                            logger.log("[FLOODGATE][WARN] service=${sourceUser.serviceId} onlineUuid=$onlineUuid pid=$profileId reason=not_a_floodgate_uuid (mostSignificantBits != 0)")
+                            continue
+                        }
+                        // xuid = leastSignificantBits (Floodgate: new UUID(0, xuid))
+                        val xuid = onlineUuid.leastSignificantBits
+                        val onlineName = sourceUser.onlineName?.takeIf { it.isNotBlank() }
+                            ?: profileIdToName[profileId]
+                            ?: "unknown-${xuid}"
+
+                        try {
+                            val existing = floodgateAuthTable.selectAll()
+                                .where { floodgateAuthTable.xuid eq xuid }
+                                .limit(1)
+                                .firstOrNull()
+
+                            if (existing == null) {
+                                floodgateAuthTable.insert { stmt ->
+                                    stmt[floodgateAuthTable.name] = onlineName
+                                    stmt[floodgateAuthTable.xuid] = xuid
+                                    stmt[floodgateAuthTable.profileId] = profileId
+                                }
+                                report.floodgateEntriesCreated++
+                                logger.log("[FLOODGATE][CREATED] xuid=$xuid name=$onlineName pid=$profileId")
+                            } else {
+                                val existingPid: UUID = existing[floodgateAuthTable.profileId]
+                                if (existingPid == profileId) {
+                                    report.floodgateEntriesMatched++
+                                    logger.log("[FLOODGATE][MATCHED] xuid=$xuid name=$onlineName pid=$profileId")
+                                } else {
+                                    report.floodgateEntryConflicts++
+                                    logger.log("[FLOODGATE][CONFLICT] xuid=$xuid name=$onlineName existedPid=$existingPid incomingPid=$profileId")
+                                }
+                            }
+                        } catch (ex: Exception) {
+                            report.floodgateEntryFailures++
+                            logger.log("[FLOODGATE][FAILED] xuid=$xuid name=$onlineName pid=$profileId reason=${ex.message}")
+                        }
                         continue
                     }
 
@@ -198,6 +253,11 @@ class MlDataMigrator(
             logger.log("targetEntryConflicts=${report.targetEntryConflicts}")
             logger.log("targetEntryFailures=${report.targetEntryFailures}")
             logger.log("missingProfileReference=${report.missingProfileReference}")
+            logger.log("floodgateEntriesCreated=${report.floodgateEntriesCreated}")
+            logger.log("floodgateEntriesMatched=${report.floodgateEntriesMatched}")
+            logger.log("floodgateEntryConflicts=${report.floodgateEntryConflicts}")
+            logger.log("floodgateEntryFailures=${report.floodgateEntryFailures}")
+            logger.log("floodgateInvalidUuid=${report.floodgateInvalidUuid}")
         }
 
         return report

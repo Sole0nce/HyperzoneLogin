@@ -32,6 +32,7 @@ dependencies {
     // The auth modules are separate plugins; keep compileOnly if you reference them
     compileOnly(project(":auth-yggd"))
     compileOnly(project(":auth-offline"))
+    compileOnly(project(":auth-floodgate"))
 
     compileOnly(libs.velocityApi)
     compileOnly(libs.brigadier)

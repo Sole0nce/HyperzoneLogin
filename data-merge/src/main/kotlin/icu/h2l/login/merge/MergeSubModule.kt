@@ -51,7 +51,8 @@ class MergeSubModule : HyperSubModule {
             runMlMigration = {
                 val report = mlMigrator.migrate()
                 "profiles(created=${report.targetProfilesCreated}, matched=${report.targetProfilesMatched}, failed=${report.targetProfileFailures}), " +
-                    "entries(created=${report.targetEntriesCreated}, matched=${report.targetEntriesMatched}, conflicts=${report.targetEntryConflicts}, failed=${report.targetEntryFailures}, missingProfile=${report.missingProfileReference})"
+                    "entries(created=${report.targetEntriesCreated}, matched=${report.targetEntriesMatched}, conflicts=${report.targetEntryConflicts}, failed=${report.targetEntryFailures}, missingProfile=${report.missingProfileReference}), " +
+                    "floodgate(created=${report.floodgateEntriesCreated}, matched=${report.floodgateEntriesMatched}, conflicts=${report.floodgateEntryConflicts}, failed=${report.floodgateEntryFailures}, invalidUuid=${report.floodgateInvalidUuid})"
             },
             runAmMigration = {
                 val report = amMigrator.migrate()

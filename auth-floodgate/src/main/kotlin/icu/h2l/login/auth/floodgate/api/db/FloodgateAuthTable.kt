@@ -19,7 +19,7 @@
  *
  */
 
-package icu.h2l.login.auth.floodgate.db
+package icu.h2l.login.auth.floodgate.api.db
 
 import icu.h2l.api.db.table.ProfileTable
 import org.jetbrains.exposed.sql.Table
@@ -32,6 +32,15 @@ data class FloodgateAuthEntry(
     val profileId: UUID,
 )
 
+/**
+ * Floodgate 认证数据表定义（公开 API）。
+ *
+ * 该表保存通过 Floodgate 接入的 Bedrock 玩家记录，
+ * 以 xuid 和 profile_id 作为唯一标识。
+ *
+ * @param prefix 表名前缀
+ * @param profileTable 主档案表引用
+ */
 class FloodgateAuthTable(prefix: String, profileTable: ProfileTable) : Table("${prefix}floodgate_auth") {
     val id = integer("id").autoIncrement()
     val name = varchar("name", 32)
