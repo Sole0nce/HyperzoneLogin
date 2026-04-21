@@ -38,6 +38,35 @@ body:
       required: true
 
   - type: textarea
+    id: plugin-version
+    attributes:
+      label: 插件版本与下载渠道
+      description: |
+        请提供你所使用的 HyperZoneLogin 各模块 jar 的**完整文件名**（例如 `HyperZoneLogin-auth-yggd-26.4.6-all.jar`），以及下载渠道（如 GitHub Releases、CI 构建、自行编译等）。
+      placeholder: |
+        例：
+        - HyperZoneLogin-26.4.6-SNAPSHOT-cd6068a7-all.jar（GitHub Actions CI）
+        - HyperZoneLogin-auth-yggd-26.4.6-all.jar（GitHub Releases）
+    validations:
+      required: true
+
+  - type: textarea
+    id: plugin-list
+    attributes:
+      label: 服务器插件列表
+      description: 请列出代理端（Velocity/BungeeCord）及各后端服务器上安装的**所有插件**的完整 jar 文件名。
+      placeholder: |
+        代理端（Velocity）：
+        - HyperZoneLogin-26.4.6-SNAPSHOT-cd6068a7-all.jar
+        - LimboAPI-1.x.x.jar
+        - ...
+
+        后端（Paper）：
+        - ...
+    validations:
+      required: true
+
+  - type: textarea
     id: question
     attributes:
       label: 具体问题
