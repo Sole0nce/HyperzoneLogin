@@ -220,6 +220,7 @@ class HyperZoneLoginMain(
             proxy.eventManager.register(plugin, BackendProfileLayerCompatListener())
         }
         proxy.eventManager.register(plugin, AttachedProfileInitialGameProfileListener())
+        proxy.eventManager.register(plugin, LoginProfileReplaceDefaultListener())
         proxy.eventManager.register(plugin, backendRuntimeProfileCompensator)
         proxy.eventManager.register(plugin, LoginRenameListener())
         proxy.eventManager.register(plugin, LoginReUuidListener())

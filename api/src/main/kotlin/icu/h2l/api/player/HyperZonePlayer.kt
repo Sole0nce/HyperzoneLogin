@@ -56,6 +56,16 @@ interface HyperZonePlayer {
      */
     val clientOriginalUUID: UUID
 
+    /**
+     * 当前会话完成认证的渠道 ID。
+     *
+     * 该值在认证模块通过 [submitCredential] 提交凭证时由核心层自动记录；
+     * 在凭证提交前（或 [resetVerify] 后）返回 null。
+     *
+     * 示例值：`"floodgate"`、`"offline"`、`"yggdrasil"`。
+     */
+    val authChannelId: String?
+        get() = null
 
     /**
      * 当前连接在预登录阶段最终判定出的在线模式。
