@@ -1,0 +1,79 @@
+# .github/workflows/sync-all-upstream-branches.yml
+name: 🔄 Auto Sync All Branches from Upstream
+
+on:
+  schedule:
+    # 每 6 小时同步一次（基于中国时区 UTC+8：北京时间 0,6,12,18 点）
+    - cron: '0 16,22,4,10 * * *'
+  workflow_dispatch:   # 允许手动触发
+
+permissions:
+  contents: write      # 推送分支所需权限
+
+jobs:
+  sync-all:
+    # 仅在 Fork 仓库中运行
+    if: github.event.repository.fork == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: ⬇️ Checkout your fork (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0               # 获取全部历史记录和所有分支
+          ref: ${{ github.event.repository.default_branch }}
+          token: ${{ secrets.SYNC_PAT }}   # 使用 PAT 获得修改工作流文件的权限
+
+      - name: 🔗 Add upstream and fetch all branches
+        run: |
+          git remote add upstream https://github.com/HyperZoneLogin/HyperzoneLogin.git
+          git fetch upstream
+
+      - name: 🔄 Sync all branches
+        shell: bash
+        run: |
+          # 获取上游所有远程分支（排除 HEAD）
+          branches=$(git branch -r | grep 'upstream/' | sed 's/upstream\///' | grep -v 'HEAD')
+
+          if [ -z "$branches" ]; then
+            echo "⚠️ No upstream branches found. Nothing to sync."
+            exit 0
+          fi
+
+          failed_branches=""
+          for branch in $branches; do
+            echo "::group::Processing upstream branch: $branch"
+
+            # 如果本地已存在该分支，切换过去并合并上游；否则创建新分支
+            if git show-ref --verify --quiet "refs/heads/$branch"; then
+              git checkout "$branch"
+              # 使用 merge 保留线性历史，如果冲突则跳过该分支
+              if git merge "upstream/$branch" --no-edit; then
+                echo "✅ Merged upstream/$branch"
+              else
+                echo "❌ Merge conflict on $branch, skipping push."
+                failed_branches="$failed_branches $branch"
+                git merge --abort 2>/dev/null || true
+                echo "::endgroup::"
+                continue
+              fi
+            else
+              git checkout -b "$branch" "upstream/$branch"
+              echo "🆕 Created new branch $branch from upstream/$branch"
+            fi
+
+            # 推送到你自己的 fork
+            git push origin "$branch"
+            echo "🚀 Pushed $branch"
+            echo "::endgroup::"
+          done
+
+          # 切换回默认分支
+          git checkout "${{ github.event.repository.default_branch }}"
+
+          if [ -n "$failed_branches" ]; then
+            echo "::warning::以下分支因冲突未能自动同步：$failed_branches，请手动解决"
+          fi
+
+      - name: ✅ Completion log
+        run: |
+          echo "同步任务完成。检查上方日志查看每个分支的处理结果。"
