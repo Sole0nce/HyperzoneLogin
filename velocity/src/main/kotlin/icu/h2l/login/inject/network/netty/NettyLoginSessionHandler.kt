@@ -46,7 +46,7 @@ import icu.h2l.login.inject.network.NettyReflectionHelper
 import icu.h2l.login.inject.network.NettyReflectionHelper.fireLogin
 import icu.h2l.login.inject.network.VelocityNetworkInjectorImpl
 import icu.h2l.login.reflect.VelocityInternalAccess
-import icu.h2l.login.vServer.outpre.OutPreAuthSessionHandler
+import icu.h2l.login.vServer.outpre.handler.OutPreAuthSessionHandler
 import icu.h2l.login.vServer.outpre.OutPreVServerAuth
 import io.netty.channel.Channel
 import io.netty.channel.ChannelHandlerContext
