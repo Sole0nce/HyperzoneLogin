@@ -40,16 +40,18 @@ import io.netty.buffer.Unpooled
 import io.netty.util.ReferenceCountUtil
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.TextComponent
-
+//为了保证兼容性，这里就当作普通的后端使用，不做queue等
 open class OutPreBackendBridgeSessionHandlerLogic(
     protected val bridge: OutPreBackendBridge,
 ) {
     protected fun refreshWaitingAreaCommands(force: Boolean = false) {
         val clientHandler = bridge.player.connection.activeSessionHandler as? OutPreClientBridgeSessionHandler
+//        第一次加入等待区
         if (clientHandler != null) {
             clientHandler.refreshWaitingAreaCommands(force)
             return
         }
+//        正常游戏中
 
         if (bridge.player.protocolVersion.lessThan(ProtocolVersion.MINECRAFT_1_13)) {
             return

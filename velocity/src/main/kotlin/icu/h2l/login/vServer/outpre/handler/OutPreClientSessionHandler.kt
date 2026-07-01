@@ -23,7 +23,6 @@ package icu.h2l.login.vServer.outpre.handler
 
 import com.velocitypowered.api.network.ProtocolVersion
 import com.velocitypowered.proxy.VelocityServer
-import com.velocitypowered.proxy.connection.MinecraftConnection
 import com.velocitypowered.proxy.connection.MinecraftSessionHandler
 import com.velocitypowered.proxy.connection.client.ClientConfigSessionHandler
 import com.velocitypowered.proxy.connection.client.ConnectedPlayer
@@ -44,34 +43,21 @@ import com.velocitypowered.proxy.protocol.packet.config.FinishedUpdatePacket
 import com.velocitypowered.proxy.protocol.packet.config.KnownPacksPacket
 import com.velocitypowered.proxy.protocol.packet.config.StartUpdatePacket
 import com.velocitypowered.proxy.protocol.util.PluginMessageUtil
-import icu.h2l.login.inject.network.NettyReflectionHelper
 import icu.h2l.login.inject.network.NettyReflectionHelper.reflectedTeardown
 import icu.h2l.login.manager.HyperChatCommandManagerImpl
 import icu.h2l.login.vServer.outpre.OutPreBackendBridge
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.Unpooled
-import io.netty.util.ReferenceCountUtil
-import io.netty.util.ReferenceCounted
-import java.util.*
 
 open class OutPreClientBridgeSessionHandlerLogic(
     protected val player: ConnectedPlayer,
     protected val bridge: OutPreBackendBridge,
     initialConfigMode: Boolean,
 ) {
-    private data class PendingWrite(
-        val requiredPhase: OutPreBackendBridge.Phase,
-        val write: (MinecraftConnection) -> Unit,
-        val release: () -> Unit = {},
-    )
-
-    private val pendingWrites = ArrayDeque<PendingWrite>()
     private var deferredBrandChannel: String? = null
     private var deferredBrandMessage: String? = null
     @Volatile
     private var waitingAreaCommandsSent = false
-    @Volatile
-    private var phaseCallbackRegistered = false
     @Volatile
     protected var releaseToVelocityCallback: (() -> Unit)? = null
     @Volatile
@@ -79,105 +65,17 @@ open class OutPreClientBridgeSessionHandlerLogic(
     @Volatile
     protected var configMode: Boolean = initialConfigMode
 
-    init {
-        ensurePhaseCallback()
-    }
-
-    private fun backend() = bridge.ensureConnected()
+    protected val queue = OutPreBridgePacketQueue(
+        bridge = bridge,
+        clientEventLoop = player.connection.eventLoop(),
+        onPhaseAdvanced = { maybeSendWaitingAreaCommands(force = false) },
+    )
 
     protected fun activeClientPhase(): OutPreBackendBridge.Phase {
         return if (configMode) OutPreBackendBridge.Phase.CONFIG else OutPreBackendBridge.Phase.PLAY_READY
     }
 
-    protected fun sendOrQueue(
-        requiredPhase: OutPreBackendBridge.Phase,
-        action: (MinecraftConnection) -> Unit,
-    ) {
-        sendOrQueue(PendingWrite(requiredPhase, action))
-    }
-
-    protected fun sendOrQueuePacket(
-        requiredPhase: OutPreBackendBridge.Phase,
-        packet: MinecraftPacket,
-    ) {
-        if (packet is ReferenceCounted) {
-            sendOrQueueRetained(
-                requiredPhase = requiredPhase,
-                writeNow = { connection -> connection.write(ReferenceCountUtil.retain(packet) as MinecraftPacket) },
-                retainForQueue = { ReferenceCountUtil.retain(packet) as MinecraftPacket },
-                writer = { connection, queuedPacket -> connection.write(queuedPacket as MinecraftPacket) },
-            )
-            return
-        }
-        sendOrQueue(requiredPhase) { it.write(packet) }
-    }
-
-    protected fun sendOrQueueRetained(
-        requiredPhase: OutPreBackendBridge.Phase,
-        writeNow: (MinecraftConnection) -> Unit,
-        retainForQueue: () -> Any,
-        writer: (MinecraftConnection, Any) -> Unit,
-    ) {
-        if (bridge.canForwardClientPackets(requiredPhase)) {
-            writeNow(backend())
-            return
-        }
-
-        if (!bridge.canQueueClientPackets()) {
-            return
-        }
-
-        val retained = retainForQueue()
-        enqueuePendingWrite(
-            PendingWrite(
-                requiredPhase = requiredPhase,
-                write = { writer(it, retained) },
-                release = { ReferenceCountUtil.safeRelease(retained) },
-            )
-        )
-    }
-
-    private fun sendOrQueue(pendingWrite: PendingWrite) {
-        if (bridge.canForwardClientPackets(pendingWrite.requiredPhase)) {
-            pendingWrite.write(backend())
-            return
-        }
-
-        if (!bridge.canQueueClientPackets()) {
-            pendingWrite.release()
-            return
-        }
-
-        enqueuePendingWrite(pendingWrite)
-    }
-
-    private fun enqueuePendingWrite(pendingWrite: PendingWrite) {
-        synchronized(pendingWrites) {
-            pendingWrites += pendingWrite
-        }
-        ensurePhaseCallback()
-    }
-
-    private fun ensurePhaseCallback() {
-        if (phaseCallbackRegistered) {
-            return
-        }
-        phaseCallbackRegistered = true
-        bridge.addPhaseListener {
-            player.connection.eventLoop().execute {
-                if (!bridge.isConnected()) {
-                    clearPendingWrites()
-                    return@execute
-                }
-                maybeSendWaitingAreaCommands()
-                flushPendingWrites()
-            }
-        }
-    }
-
-    private fun maybeSendWaitingAreaCommands() {
-        maybeSendWaitingAreaCommands(force = false)
-    }
+    // ---- 等待区命令 ----
 
     protected fun maybeSendWaitingAreaCommands(force: Boolean) {
         if ((!force && waitingAreaCommandsSent)
@@ -200,6 +98,13 @@ open class OutPreClientBridgeSessionHandlerLogic(
             maybeSendWaitingAreaCommands(force)
         }
     }
+
+    protected fun handleWaitingAreaInput(rawInput: String): Boolean {
+        HyperChatCommandManagerImpl.executeChat(player, rawInput)
+        return true
+    }
+
+    // ---- 释放到 Velocity ----
 
     fun releaseToVelocity(server: VelocityServer, onReleased: () -> Unit) {
         player.connection.eventLoop().execute {
@@ -242,48 +147,7 @@ open class OutPreClientBridgeSessionHandlerLogic(
         }
     }
 
-    protected fun handleWaitingAreaInput(rawInput: String): Boolean {
-        HyperChatCommandManagerImpl.executeChat(player, rawInput)
-        return true
-    }
-
-    private fun flushPendingWrites() {
-        val readyWrites = ArrayList<PendingWrite>()
-        synchronized(pendingWrites) {
-            if (pendingWrites.isEmpty()) {
-                return
-            }
-
-            val remainingWrites = ArrayDeque<PendingWrite>()
-            while (pendingWrites.isNotEmpty()) {
-                val next = pendingWrites.removeFirst()
-                if (bridge.canForwardClientPackets(next.requiredPhase)) {
-                    readyWrites += next
-                } else {
-                    remainingWrites += next
-                }
-            }
-            pendingWrites += remainingWrites
-        }
-
-        if (readyWrites.isEmpty()) {
-            return
-        }
-
-        val backend = backend()
-        readyWrites.forEach { pendingWrite ->
-            pendingWrite.write(backend)
-        }
-    }
-
-    protected fun clearPendingWrites() {
-        while (true) {
-            val next = synchronized(pendingWrites) {
-                if (pendingWrites.isEmpty()) null else pendingWrites.removeFirst()
-            } ?: return
-            next.release()
-        }
-    }
+    // ---- 延迟 brand 处理 ----
 
     protected fun captureDeferredBrand(packet: PluginMessagePacket) {
         deferredBrandChannel = packet.channel
@@ -297,7 +161,7 @@ open class OutPreClientBridgeSessionHandlerLogic(
         val brandMessage = deferredBrandMessage ?: return
         val brandBuf = Unpooled.buffer()
         ProtocolUtils.writeString(brandBuf, brandMessage)
-        sendOrQueuePacket(
+        queue.sendPacket(
             requiredPhase = OutPreBackendBridge.Phase.CONFIG,
             packet = PluginMessagePacket(brandChannel, brandBuf),
         )
@@ -324,7 +188,7 @@ class OutPreClientBridgeSessionHandler(
             captureDeferredBrand(packet)
             return true
         }
-        sendOrQueueRetained(
+        queue.sendRetained(
             requiredPhase = activeClientPhase(),
             writeNow = { it.write(packet.retain()) },
             retainForQueue = { packet.retain() },
@@ -334,33 +198,33 @@ class OutPreClientBridgeSessionHandler(
     }
 
     override fun handle(packet: KeepAlivePacket): Boolean {
-        sendOrQueue(activeClientPhase()) { it.write(packet) }
+        queue.send(activeClientPhase()) { it.write(packet) }
         return true
     }
 
     override fun handle(packet: ClientSettingsPacket): Boolean {
         player.setClientSettings(packet)
-        sendOrQueue(activeClientPhase()) { it.write(packet) }
+        queue.send(activeClientPhase()) { it.write(packet) }
         return true
     }
 
     override fun handle(packet: ResourcePackResponsePacket): Boolean {
-        sendOrQueue(activeClientPhase()) { it.write(packet) }
+        queue.send(activeClientPhase()) { it.write(packet) }
         return true
     }
 
     override fun handle(packet: KnownPacksPacket): Boolean {
-        sendOrQueue(activeClientPhase()) { it.write(packet) }
+        queue.send(activeClientPhase()) { it.write(packet) }
         return true
     }
 
     override fun handle(packet: ServerboundCookieResponsePacket): Boolean {
-        sendOrQueue(activeClientPhase()) { it.write(packet) }
+        queue.send(activeClientPhase()) { it.write(packet) }
         return true
     }
 
     override fun handle(packet: ServerboundCustomClickActionPacket): Boolean {
-        sendOrQueueRetained(
+        queue.sendRetained(
             requiredPhase = activeClientPhase(),
             writeNow = { it.write(packet.retain()) },
             retainForQueue = { packet.retain() },
@@ -370,12 +234,12 @@ class OutPreClientBridgeSessionHandler(
     }
 
     override fun handle(packet: CodeOfConductAcceptPacket): Boolean {
-        sendOrQueue(activeClientPhase()) { it.write(packet) }
+        queue.send(activeClientPhase()) { it.write(packet) }
         return true
     }
 
     override fun handle(packet: PingIdentifyPacket): Boolean {
-        sendOrQueue(activeClientPhase()) { it.write(packet) }
+        queue.send(activeClientPhase()) { it.write(packet) }
         return true
     }
 
@@ -396,17 +260,17 @@ class OutPreClientBridgeSessionHandler(
     }
 
     override fun handle(packet: PlayerChatCompletionPacket): Boolean {
-        sendOrQueue(OutPreBackendBridge.Phase.PLAY_READY) { it.write(packet) }
+        queue.send(OutPreBackendBridge.Phase.PLAY_READY) { it.write(packet) }
         return true
     }
 
     override fun handle(packet: ChatAcknowledgementPacket): Boolean {
-        sendOrQueue(OutPreBackendBridge.Phase.PLAY_READY) { it.write(packet) }
+        queue.send(OutPreBackendBridge.Phase.PLAY_READY) { it.write(packet) }
         return true
     }
 
     override fun handle(packet: LoginPluginResponsePacket): Boolean {
-        sendOrQueuePacket(OutPreBackendBridge.Phase.LOGIN, packet)
+        queue.sendPacket(OutPreBackendBridge.Phase.LOGIN, packet)
         return true
     }
 
@@ -430,7 +294,7 @@ class OutPreClientBridgeSessionHandler(
             maybeSendWaitingAreaCommands(force = true)
             return true
         }
-        sendOrQueue(activeClientPhase()) { it.write(packet) }
+        queue.send(activeClientPhase()) { it.write(packet) }
         return true
     }
 
@@ -446,11 +310,11 @@ class OutPreClientBridgeSessionHandler(
                 return
             }
         }
-        sendOrQueuePacket(activeClientPhase(), packet)
+        queue.sendPacket(activeClientPhase(), packet)
     }
 
     override fun handleUnknown(buf: ByteBuf) {
-        sendOrQueueRetained(
+        queue.sendRetained(
             requiredPhase = activeClientPhase(),
             writeNow = { it.write(buf.retain()) },
             retainForQueue = { buf.retain() },
@@ -459,7 +323,7 @@ class OutPreClientBridgeSessionHandler(
     }
 
     override fun disconnected() {
-        clearPendingWrites()
+        queue.clear()
         bridge.disconnect()
         runCatching {
             player.reflectedTeardown()
