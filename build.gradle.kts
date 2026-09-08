@@ -374,8 +374,9 @@ val collectCtdPluginJars = tasks.register<Sync>("collectCtdPluginJars") {
     dependsOn(buildVelocityCtd)
 
     val velocityProject = project(":velocity")
-    from(velocityProject.layout.buildDirectory.file("libs/HyperZoneLogin-${version}-ctd.jar"))
-    from(velocityProject.layout.buildDirectory.file("libs/HyperZoneLogin-${version}-all-ctd.jar"))
+    // CTD jars now live in libs-ctd/ so they never mix with the official libs/ output.
+    from(velocityProject.layout.buildDirectory.file("libs-ctd/HyperZoneLogin-${version}-ctd.jar"))
+    from(velocityProject.layout.buildDirectory.file("libs-ctd/HyperZoneLogin-${version}-all-ctd.jar"))
 }
 
 val buildMonolith = tasks.register("buildMonolith") {

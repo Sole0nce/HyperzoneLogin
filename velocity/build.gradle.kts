@@ -157,6 +157,10 @@ tasks {
     named<Jar>("jar") {
         archiveBaseName.set("HyperZoneLogin")
         archiveClassifier.set(if (velocityCtdBuild) "ctd" else "")
+        // Keep the official and VelocityCTD builds in separate directories so one build
+        // never writes ctd jars into the official libs dir (or vice versa). Without this
+        // the two variants coexist in build/libs and the "wrong" variant appears as stray.
+        destinationDirectory.set(if (velocityCtdBuild) layout.buildDirectory.dir("libs-ctd") else layout.buildDirectory.dir("libs"))
         duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
         val apiProject = project(":api")
@@ -170,6 +174,8 @@ tasks {
         description = "Builds an all-in-one HyperZoneLogin jar with embedded optional modules and CLI tool."
         archiveBaseName.set("HyperZoneLogin")
         archiveClassifier.set(if (velocityCtdBuild) "all-ctd" else "all")
+        // Same per-variant split as the "jar" task (see above).
+        destinationDirectory.set(if (velocityCtdBuild) layout.buildDirectory.dir("libs-ctd") else layout.buildDirectory.dir("libs"))
         duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
         val currentSourceSets = project.extensions.getByType(SourceSetContainer::class.java)
