@@ -20,7 +20,7 @@
  */
 
 import org.gradle.jvm.tasks.Jar
-import org.gradle.api.tasks.GradleBuild
+import org.gradle.api.tasks.Exec
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.temporal.WeekFields
@@ -334,13 +334,37 @@ val collectSplitPluginJars = tasks.register<Sync>("collectSplitPluginJars") {
         }
 }
 
-val buildVelocityCtd = tasks.register<GradleBuild>("buildVelocityCtd") {
+val buildVelocityCtd = tasks.register<Exec>("buildVelocityCtd") {
     group = "build"
     description = "Builds VelocityCTD-flavored HyperZoneLogin jars using com.velocityctd Velocity dependencies."
-    dir = rootDir
-    tasks = listOf(":velocity:jar", ":velocity:monolithJar")
-    startParameter.projectProperties.putAll(gradle.startParameter.projectProperties)
-    startParameter.projectProperties["velocityCtd"] = "true"
+    workingDir = rootDir
+
+    // VelocityCTD is built as a separate Gradle invocation, NOT a nested in-process build.
+    // A nested GradleBuild runs inside the same daemon/JVM as the outer build, and the Kotlin
+    // incremental compiler keeps a process-wide registry (FilePageCache) of its .tab cache
+    // files keyed by absolute path. The outer build runs :api:compileKotlin against the
+    // official Velocity API; the CTD build would run it again against VelocityCTD in that same
+    // JVM, so the second compile re-opens the same cacheable/caches-jvm/**/*.tab files that the
+    // first one already registered, failing with "Storage for [...] is already registered".
+    // Launching `gradlew --no-daemon` here gives the CTD build its own JVM with its own
+    // FilePageCache, so the two compile tasks never share that registry. We pass through
+    // -PreleaseChannel/etc. from the driving build so version computation stays consistent.
+    val projectProperties = gradle.startParameter.projectProperties
+        .filterKeys { it !in setOf("velocityCtd") }
+        .map { (key, value) -> "-P$key=$value" }
+
+    doFirst {
+        val onWindows = System.getProperty("os.name").lowercase().contains("windows")
+        val wrapper = rootDir.resolve(if (onWindows) "gradlew.bat" else "gradlew").absolutePath
+        val base = if (onWindows) listOf("cmd", "/c", wrapper) else listOf(wrapper)
+        commandLine(
+            *(base + listOf("--no-daemon") + projectProperties + listOf(
+                ":velocity:jar",
+                ":velocity:monolithJar",
+                "-PvelocityCtd=true",
+            )).toTypedArray(),
+        )
+    }
 }
 
 val collectCtdPluginJars = tasks.register<Sync>("collectCtdPluginJars") {
