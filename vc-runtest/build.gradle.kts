@@ -28,6 +28,16 @@ plugins {
     java
 }
 
+java {
+    // Same JDK as the rest of the project (subprojects sets jvmToolchain(25) for Kotlin).
+    // Without this the JavaCompile runs with the Gradle daemon's own JDK and, when that is
+    // not 25, fails with "release version 25 not supported" because of options.release below.
+    // The foojay-resolver-convention plugin auto-provisions JDK 25 if it isn't present.
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(25))
+    }
+}
+
 tasks.withType<JavaCompile>().configureEach {
     options.release.set(25)
 }
